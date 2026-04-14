@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PropConnect | 不動産取引プラットフォーム</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{--navy:#1F3864;--blue:#2E75B6;--red:#C00000;--green:#1F6B3A;}
+*{box-sizing:border-box;}
+body{font-family:'Helvetica Neue',Arial,'Hiragino Sans','Meiryo',sans-serif;margin:0;background:#F5F7FA;}
+#map{height:100%;width:100%;z-index:1;}
+.leaflet-container{font-family:inherit;}
+.page{display:none;}
+.page.active{display:flex;flex-direction:column;height:100%;overflow:hidden;}
+.scroll-content{overflow-y:auto;flex:1;}
+/* Sidebar */
+#sidebar{width:220px;min-width:220px;background:var(--navy);display:flex;flex-direction:column;height:100vh;}
+#sidebar .logo{padding:20px 16px 16px;border-bottom:1px solid rgba(255,255,255,0.12);}
+#sidebar .logo-title{color:#fff;font-size:18px;font-weight:700;letter-spacing:0.5px;}
+#sidebar .logo-sub{color:rgba(255,255,255,0.5);font-size:10px;margin-top:2px;}
+#sidebar nav a{display:flex;align-items:center;gap:10px;padding:11px 16px;color:rgba(255,255,255,0.72);font-size:13px;text-decoration:none;border-left:3px solid transparent;transition:all 0.15s;}
+#sidebar nav a:hover{background:rgba(255,255,255,0.08);color:#fff;}
+#sidebar nav a.active{background:rgba(46,117,182,0.35);color:#fff;border-left-color:#2E75B6;}
+#sidebar nav a .badge{margin-left:auto;background:#C00000;color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;}
+#sidebar .user-box{padding:14px 16px;border-top:1px solid rgba(255,255,255,0.12);margin-top:auto;}
+#sidebar .user-name{color:#fff;font-size:12px;font-weight:600;}
+#sidebar .user-co{color:rgba(255,255,255,0.5);font-size:10px;margin-top:2px;}
+/* Header */
+#appHeader{height:56px;min-height:56px;background:#fff;border-bottom:1px solid #E5E9EF;display:flex;align-items:center;padding:0 24px;gap:16px;}
+#appHeader .page-title{font-size:16px;font-weight:700;color:var(--navy);flex:1;}
+/* Cards */
+.prop-card{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,0.08);overflow:hidden;cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;}
+.prop-card:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.13);}
+.prop-card .card-header{padding:14px 16px 10px;border-bottom:1px solid #F0F2F5;}
+.prop-card .card-body{padding:12px 16px;}
+.tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;}
+.tag-office{background:#EBF3FB;color:#1F3864;}
+.tag-res{background:#E8F5E9;color:#1F6B3A;}
+.tag-com{background:#FFF3E0;color:#C55A11;}
+.tag-owned{background:#D5E8F0;color:#1F3864;}
+.tag-sale{background:#FFE5E5;color:#C00000;}
+.tag-case{background:#E6F4EC;color:#1F6B3A;}
+/* Status badge */
+.status-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px;}
+.dot-owned{background:var(--navy);}
+.dot-sale{background:var(--red);}
+.dot-case{background:var(--green);}
+/* Lock overlay */
+.lock-overlay{background:rgba(245,247,250,0.95);border:2px dashed #CBD5E1;border-radius:8px;padding:32px;text-align:center;}
+/* Modal */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;align-items:center;justify-content:center;}
+.modal-bg.open{display:flex;}
+.modal{background:#fff;border-radius:12px;padding:32px;max-width:520px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.25);}
+/* Stats */
+.stat-card{background:#fff;border-radius:10px;padding:16px 20px;box-shadow:0 1px 4px rgba(0,0,0,0.07);}
+.stat-num{font-size:28px;font-weight:700;color:var(--navy);}
+.stat-label{font-size:12px;color:#64748B;margin-top:2px;}
+/* Map legend */
+.map-legend{position:absolute;bottom:24px;right:12px;z-index:500;background:rgba(255,255,255,0.95);border-radius:8px;padding:10px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.15);font-size:12px;}
+.legend-item{display:flex;align-items:center;gap:7px;margin:4px 0;}
+.legend-dot{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,0.8);box-shadow:0 1px 3px rgba(0,0,0,0.3);}
+/* AI demo */
+.ai-step{border-left:3px solid #E5E9EF;padding-left:16px;margin-left:12px;}
+.ai-step.done{border-left-color:var(--green);}
+.ai-step.active{border-left-color:var(--blue);}
+/* Filter bar */
+.filter-btn{padding:5px 14px;border-radius:20px;font-size:12px;border:1px solid #CBD5E1;background:#fff;cursor:pointer;transition:all 0.15s;}
+.filter-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+/* Table */
+.data-table{width:100%;border-collapse:collapse;font-size:13px;}
+.data-table th{background:#F1F5F9;padding:10px 14px;text-align:left;font-weight:600;color:#475569;border-bottom:1px solid #E2E8F0;}
+.data-table td{padding:10px 14px;border-bottom:1px solid #F1F5F9;color:#374151;}
+.data-table tr:hover td{background:#F9FAFB;}
+/* Popup */
+.leaflet-popup-content-wrapper{border-radius:8px!important;box-shadow:0 4px 16px rgba(0,0,0,0.18)!important;}
+.leaflet-popup-content{margin:12px 16px!important;font-family:inherit;}
+/* Progress bar */
+.progress-bar{height:8px;border-radius:4px;background:#E5E9EF;overflow:hidden;}
+.progress-fill{height:100%;border-radius:4px;background:var(--blue);transition:width 0.4s;}
+/* Timeline */
+.timeline-item{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #F1F5F9;}
+.timeline-dot{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px;}
+/* Number format */
+input[type=range]{accent-color:var(--navy);}
+/* Notification badge */
+.notif-badge{background:#C00000;color:#fff;border-radius:50%;width:18px;height:18px;font-size:10px;display:inline-flex;align-items:center;justify-content:center;}
+</style>
+</head>
+<body>
+
+<!-- ==================== LOGIN PAGE ==================== -->
+<div id="loginPage" style="min-height:100vh;background:linear-gradient(135deg,#1F3864 0%,#2E75B6 60%,#1F6B3A 100%);display:flex;align-items:center;justify-content:center;">
+  <div style="width:100%;max-width:420px;padding:0 20px;">
+    <div style="text-align:center;margin-bottom:36px;">
+      <div style="font-size:28px;font-weight:800;color:#fff;letter-spacing:1px;">PropConnect</div>
+      <div style="color:rgba(255,255,255,0.7);font-size:13px;margin-top:6px;">不動産取引プラットフォーム</div>
+    </div>
+    <div style="background:rgba(255,255,255,0.97);border-radius:16px;padding:36px 32px;box-shadow:0 24px 64px rgba(0,0,0,0.3);">
+      <div style="font-size:20px;font-weight:700;color:#1F3864;margin-bottom:24px;">ログイン</div>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:12px;color:#64748B;font-weight:600;display:block;margin-bottom:6px;">メールアドレス</label>
+        <input type="email" value="tanaka@tokyo-realty-fund.co.jp" style="width:100%;padding:10px 14px;border:1px solid #CBD5E1;border-radius:8px;font-size:14px;outline:none;" onfocus="this.style.borderColor='#2E75B6'" onblur="this.style.borderColor='#CBD5E1'">
+      </div>
+      <div style="margin-bottom:24px;">
+        <label style="font-size:12px;color:#64748B;font-weight:600;display:block;margin-bottom:6px;">パスワード</label>
+        <input type="password" value="••••••••" style="width:100%;padding:10px 14px;border:1px solid #CBD5E1;border-radius:8px;font-size:14px;outline:none;" onfocus="this.style.borderColor='#2E75B6'" onblur="this.style.borderColor='#CBD5E1'">
+      </div>
+      <button onclick="doLogin()" style="width:100%;padding:13px;background:#1F3864;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#2E75B6'" onmouseout="this.style.background='#1F3864'">
+        ログイン
+      </button>
+      <div style="margin-top:16px;padding:12px;background:#EBF3FB;border-radius:8px;font-size:12px;color:#1F3864;">
+        <b>デモ用アカウント</b><br>田中 太郎 / 東京不動産ファンド株式会社<br>ロール：売主・買主
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:20px;color:rgba(255,255,255,0.6);font-size:12px;">
+      会員登録は管理者審査制です。<a href="#" style="color:rgba(255,255,255,0.85);text-decoration:underline;">会員申請はこちら</a>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== MAIN APP ==================== -->
+<div id="app" style="display:none;height:100vh;overflow:hidden;flex-direction:row;">
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div class="logo">
+      <div class="logo-title">⬡ PropConnect</div>
+      <div class="logo-sub">不動産取引プラットフォーム</div>
+    </div>
+    <nav style="padding:12px 0;flex:1;">
+      <a href="#" class="active" onclick="showPage('map');return false;" id="nav-map">
+        <i class="fa-solid fa-map" style="width:16px;"></i> ダッシュボード
+      </a>
+      <a href="#" onclick="showPage('list');return false;" id="nav-list">
+        <i class="fa-solid fa-building" style="width:16px;"></i> 物件一覧
+      </a>
+      <a href="#" onclick="showPage('offers');return false;" id="nav-offers">
+        <i class="fa-solid fa-envelope" style="width:16px;"></i> オファー管理
+        <span class="badge">3</span>
+      </a>
+      <a href="#" onclick="showPage('ai');return false;" id="nav-ai">
+        <i class="fa-solid fa-wand-magic-sparkles" style="width:16px;"></i> AIアシスタント
+      </a>
+      <a href="#" onclick="showPage('history');return false;" id="nav-history">
+        <i class="fa-solid fa-chart-bar" style="width:16px;"></i> 取引事例DB
+      </a>
+    </nav>
+    <div class="user-box">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:34px;height:34px;border-radius:50%;background:#2E75B6;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex-shrink:0;">田</div>
+        <div>
+          <div class="user-name">田中 太郎</div>
+          <div class="user-co">東京不動産ファンド㈱</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div style="flex:1;display:flex;flex-direction:column;height:100vh;overflow:hidden;">
+    <!-- HEADER -->
+    <div id="appHeader">
+      <span id="pageTitle" class="page-title">ダッシュボード</span>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <!-- Stats summary -->
+        <div style="display:flex;gap:16px;font-size:12px;">
+          <span><span class="status-dot dot-owned"></span><b>保有</b> 10件</span>
+          <span><span class="status-dot dot-sale"></span><b>売却中</b> 25件</span>
+          <span><span class="status-dot dot-case"></span><b>取引事例</b> 15件</span>
+        </div>
+        <div style="width:1px;height:24px;background:#E5E9EF;"></div>
+        <button onclick="showPage('offers')" style="position:relative;background:none;border:none;cursor:pointer;color:#64748B;font-size:20px;">
+          <i class="fa-solid fa-bell"></i>
+          <span class="notif-badge" style="position:absolute;top:-4px;right:-4px;">3</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- PAGES CONTAINER -->
+    <div style="flex:1;overflow:hidden;position:relative;">
+      <!-- ===== PAGE: MAP ===== -->
+      <div id="page-map" class="page active">
+        <div style="flex:1;position:relative;">
+          <div id="map"></div>
+          <!-- Map Legend -->
+          <div class="map-legend">
+            <div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:6px;">凡例</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#1F3864;"></div><span>保有物件 (10)</span></div>
+            <div class="legend-item"><div class="legend-dot" style="background:#C00000;"></div><span>売却物件 (25)</span></div>
+            <div class="legend-item"><div class="legend-dot" style="background:#1F6B3A;"></div><span>取引事例 (15)</span></div>
+          </div>
+          <!-- Map filter overlay -->
+          <div style="position:absolute;top:12px;left:12px;z-index:500;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="filter-btn active" onclick="mapFilter('all',this)">すべて</button>
+            <button class="filter-btn" onclick="mapFilter('owned',this)">保有物件</button>
+            <button class="filter-btn" onclick="mapFilter('sale',this)">売却物件</button>
+            <button class="filter-btn" onclick="mapFilter('case',this)">取引事例</button>
+            <button class="filter-btn" onclick="mapFilter('オフィス',this)">オフィス</button>
+            <button class="filter-btn" onclick="mapFilter('住宅',this)">住宅</button>
+            <button class="filter-btn" onclick="mapFilter('商業',this)">商業</button>
+          </div>
+        </div>
+        <!-- Stats bar below map -->
+        <div style="padding:16px 20px;background:#fff;border-top:1px solid #E5E9EF;display:flex;gap:16px;overflow-x:auto;flex-shrink:0;">
+          <div class="stat-card" style="min-width:150px;">
+            <div class="stat-num" style="color:#1F3864;">10</div>
+            <div class="stat-label"><span class="status-dot dot-owned"></span>保有物件</div>
+          </div>
+          <div class="stat-card" style="min-width:150px;">
+            <div class="stat-num" style="color:#C00000;">25</div>
+            <div class="stat-label"><span class="status-dot dot-sale"></span>売却物件</div>
+          </div>
+          <div class="stat-card" style="min-width:150px;">
+            <div class="stat-num" style="color:#1F6B3A;">15</div>
+            <div class="stat-label"><span class="status-dot dot-case"></span>取引事例</div>
+          </div>
+          <div class="stat-card" style="min-width:150px;">
+            <div class="stat-num">4.5%</div>
+            <div class="stat-label">平均NOI利回り（保有）</div>
+          </div>
+          <div class="stat-card" style="min-width:150px;">
+            <div class="stat-num">4.1%</div>
+            <div class="stat-label">平均NOI利回り（売却中）</div>
+          </div>
+          <div class="stat-card" style="min-width:200px;">
+            <div class="stat-num">4.3%</div>
+            <div class="stat-label">平均NOI利回り（取引事例）</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== PAGE: LIST ===== -->
+      <div id="page-list" class="page">
+        <div style="padding:16px 20px;background:#fff;border-bottom:1px solid #E5E9EF;display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex-shrink:0;">
+          <span style="font-size:12px;color:#64748B;font-weight:600;margin-right:4px;">種別：</span>
+          <button class="filter-btn active" onclick="listFilter('status','all',this)">すべて</button>
+          <button class="filter-btn" onclick="listFilter('status','owned',this)">保有物件</button>
+          <button class="filter-btn" onclick="listFilter('status','sale',this)">売却物件</button>
+          <button class="filter-btn" onclick="listFilter('status','case',this)">取引事例</button>
+          <div style="width:1px;height:20px;background:#E5E9EF;margin:0 4px;"></div>
+          <span style="font-size:12px;color:#64748B;font-weight:600;margin-right:4px;">用途：</span>
+          <button class="filter-btn active" onclick="listFilter('type','all',this)">すべて</button>
+          <button class="filter-btn" onclick="listFilter('type','オフィス',this)">オフィス</button>
+          <button class="filter-btn" onclick="listFilter('type','住宅',this)">住宅</button>
+          <button class="filter-btn" onclick="listFilter('type','商業',this)">商業</button>
+          <div style="margin-left:auto;font-size:12px;color:#64748B;" id="listCount">50件表示</div>
+        </div>
+        <div class="scroll-content" style="padding:20px;">
+          <div id="propGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;"></div>
+        </div>
+      </div>
+
+      <!-- ===== PAGE: DETAIL ===== -->
+      <div id="page-detail" class="page">
+        <div style="padding:12px 20px;background:#fff;border-bottom:1px solid #E5E9EF;display:flex;align-items:center;gap:12px;flex-shrink:0;">
+          <button onclick="showPage('list')" style="background:none;border:none;cursor:pointer;color:#64748B;font-size:13px;display:flex;align-items:center;gap:6px;">
+            <i class="fa-solid fa-arrow-left"></i> 物件一覧に戻る
+          </button>
+          <span style="color:#CBD5E1;">/</span>
+          <span id="detailBreadcrumb" style="font-size:13px;color:#374151;font-weight:600;"></span>
+        </div>
+        <div class="scroll-content" style="padding:24px;">
+          <div id="detailContent"></div>
+        </div>
+      </div>
+
+      <!-- ===== PAGE: OFFERS ===== -->
+      <div id="page-offers" class="page">
+        <div class="scroll-content" style="padding:24px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+            <!-- 受信オファー -->
+            <div>
+              <div style="font-size:15px;font-weight:700;color:#1F3864;margin-bottom:16px;">
+                <i class="fa-solid fa-inbox" style="color:#2E75B6;"></i> 受信オファー
+                <span style="background:#C00000;color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;margin-left:8px;">3件</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:12px;" id="inboxList"></div>
+            </div>
+            <!-- 送信オファー -->
+            <div>
+              <div style="font-size:15px;font-weight:700;color:#1F3864;margin-bottom:16px;">
+                <i class="fa-solid fa-paper-plane" style="color:#1F6B3A;"></i> 送信オファー
+              </div>
+              <div style="display:flex;flex-direction:column;gap:12px;" id="sentList"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== PAGE: AI ===== -->
+      <div id="page-ai" class="page">
+        <div class="scroll-content" style="padding:24px;max-width:800px;margin:0 auto;width:100%;">
+          <div style="font-size:18px;font-weight:700;color:#1F3864;margin-bottom:6px;">
+            <i class="fa-solid fa-wand-magic-sparkles" style="color:#2E75B6;"></i> AIアシスタント
+          </div>
+          <div style="font-size:13px;color:#64748B;margin-bottom:28px;">PMRレポート・レントロール・収支表をアップロードすると、収支・RR情報を自動抽出してTeaser PDFを生成します。</div>
+
+          <!-- Upload area -->
+          <div id="aiUpload" style="border:2px dashed #CBD5E1;border-radius:12px;padding:40px;text-align:center;background:#F9FAFB;cursor:pointer;" onclick="startAIDemo()">
+            <i class="fa-solid fa-cloud-arrow-up" style="font-size:40px;color:#CBD5E1;margin-bottom:12px;display:block;"></i>
+            <div style="font-size:15px;font-weight:600;color:#374151;margin-bottom:6px;">ファイルをドロップまたはクリックしてアップロード</div>
+            <div style="font-size:12px;color:#94A3B8;">対応形式：PDF / Excel (.xlsx) / Word (.docx) ｜ 最大 50MB</div>
+            <div style="margin-top:16px;">
+              <button onclick="startAIDemo()" style="background:#1F3864;color:#fff;border:none;padding:10px 28px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">
+                デモを実行する（サンプルPMR）
+              </button>
+            </div>
+          </div>
+
+          <!-- AI Processing steps -->
+          <div id="aiSteps" style="display:none;margin-top:28px;">
+            <div style="font-size:14px;font-weight:700;color:#1F3864;margin-bottom:16px;">処理状況</div>
+            <div style="display:flex;flex-direction:column;gap:0;">
+              <div id="step1" class="ai-step" style="padding-bottom:20px;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                  <div id="step1-icon" style="width:28px;height:28px;border-radius:50%;background:#E5E9EF;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">1</div>
+                  <span style="font-size:13px;font-weight:600;color:#374151;">ファイル読み込み・テキスト抽出</span>
+                </div>
+                <div id="step1-bar" class="progress-bar" style="display:none;"><div class="progress-fill" id="step1-fill" style="width:0%"></div></div>
+                <div id="step1-msg" style="font-size:12px;color:#64748B;margin-top:4px;"></div>
+              </div>
+              <div id="step2" class="ai-step" style="padding-bottom:20px;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                  <div id="step2-icon" style="width:28px;height:28px;border-radius:50%;background:#E5E9EF;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">2</div>
+                  <span style="font-size:13px;font-weight:600;color:#374151;">Claude AIによる収支・RR情報の解析</span>
+                </div>
+                <div id="step2-bar" class="progress-bar" style="display:none;"><div class="progress-fill" id="step2-fill" style="width:0%"></div></div>
+                <div id="step2-msg" style="font-size:12px;color:#64748B;margin-top:4px;"></div>
+              </div>
+              <div id="step3" class="ai-step" style="padding-bottom:20px;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                  <div id="step3-icon" style="width:28px;height:28px;border-radius:50%;background:#E5E9EF;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">3</div>
+                  <span style="font-size:13px;font-weight:600;color:#374151;">データ検証・物件情報への自動登録</span>
+                </div>
+                <div id="step3-msg" style="font-size:12px;color:#64748B;margin-top:4px;"></div>
+              </div>
+              <div id="step4" class="ai-step" style="padding-bottom:8px;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                  <div id="step4-icon" style="width:28px;height:28px;border-radius:50%;background:#E5E9EF;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">4</div>
+                  <span style="font-size:13px;font-weight:600;color:#374151;">物件TeaserのPDF自動生成</span>
+                </div>
+                <div id="step4-msg" style="font-size:12px;color:#64748B;margin-top:4px;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI Results -->
+          <div id="aiResults" style="display:none;margin-top:28px;">
+            <div style="font-size:14px;font-weight:700;color:#1F6B3A;margin-bottom:16px;">
+              <i class="fa-solid fa-circle-check"></i> 抽出完了 — 確認して登録してください
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+              <div style="background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,0.07);">
+                <div style="font-size:12px;font-weight:700;color:#1F3864;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #F1F5F9;">収支サマリー</div>
+                <table style="width:100%;font-size:13px;">
+                  <tr><td style="color:#64748B;padding:4px 0;">年間総収入</td><td style="text-align:right;font-weight:600;">¥324,000,000</td></tr>
+                  <tr><td style="color:#64748B;padding:4px 0;">年間総費用</td><td style="text-align:right;font-weight:600;">¥89,600,000</td></tr>
+                  <tr style="border-top:1px solid #F1F5F9;"><td style="color:#1F3864;padding:6px 0;font-weight:700;">NOI</td><td style="text-align:right;font-weight:700;color:#1F3864;">¥234,400,000</td></tr>
+                  <tr><td style="color:#1F6B3A;padding:4px 0;font-weight:700;">NOI利回り</td><td style="text-align:right;font-weight:700;color:#1F6B3A;">4.50%</td></tr>
+                  <tr><td style="color:#2E75B6;padding:4px 0;font-weight:700;">NCF利回り</td><td style="text-align:right;font-weight:700;color:#2E75B6;">4.19%</td></tr>
+                </table>
+              </div>
+              <div style="background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,0.07);">
+                <div style="font-size:12px;font-weight:700;color:#1F3864;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #F1F5F9;">RRサマリー</div>
+                <table style="width:100%;font-size:13px;">
+                  <tr><td style="color:#64748B;padding:4px 0;">テナント数</td><td style="text-align:right;font-weight:600;">8テナント</td></tr>
+                  <tr><td style="color:#64748B;padding:4px 0;">総賃貸面積</td><td style="text-align:right;font-weight:600;">3,220㎡</td></tr>
+                  <tr><td style="color:#64748B;padding:4px 0;">月額賃料収入</td><td style="text-align:right;font-weight:600;">¥21,500,000</td></tr>
+                  <tr style="border-top:1px solid #F1F5F9;"><td style="color:#1F6B3A;padding:6px 0;font-weight:700;">稼働率</td><td style="text-align:right;font-weight:700;color:#1F6B3A;">95.2%</td></tr>
+                  <tr><td style="color:#64748B;padding:4px 0;">平均坪単価</td><td style="text-align:right;font-weight:600;">¥22,000/坪</td></tr>
+                </table>
+              </div>
+            </div>
+            <!-- RR Table -->
+            <div style="background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,0.07);margin-bottom:16px;">
+              <div style="font-size:12px;font-weight:700;color:#1F3864;margin-bottom:12px;">レントロール詳細（AIが抽出）</div>
+              <div style="overflow-x:auto;">
+                <table class="data-table">
+                  <thead><tr><th>テナント</th><th>用途</th><th>面積(㎡)</th><th>月額賃料</th><th>坪単価</th><th>契約満了</th></tr></thead>
+                  <tbody>
+                    <tr><td>テナントA</td><td>オフィス</td><td>680</td><td>¥4,800,000</td><td>¥23,300</td><td>2026年3月</td></tr>
+                    <tr><td>テナントB</td><td>オフィス</td><td>520</td><td>¥3,640,000</td><td>¥23,100</td><td>2027年6月</td></tr>
+                    <tr><td>テナントC</td><td>オフィス</td><td>480</td><td>¥3,360,000</td><td>¥23,100</td><td>2025年9月</td></tr>
+                    <tr><td>テナントD</td><td>オフィス</td><td>420</td><td>¥2,940,000</td><td>¥23,100</td><td>2028年12月</td></tr>
+                    <tr><td>テナントE</td><td>オフィス</td><td>380</td><td>¥2,660,000</td><td>¥23,100</td><td>2026年9月</td></tr>
+                    <tr><td>テナントF</td><td>店舗</td><td>280</td><td>¥2,240,000</td><td>¥26,400</td><td>2027年3月</td></tr>
+                    <tr><td>テナントG</td><td>オフィス</td><td>260</td><td>¥1,820,000</td><td>¥23,100</td><td>2029年3月</td></tr>
+                    <tr style="background:#FFF8E1;"><td>空室</td><td>—</td><td>200</td><td>—</td><td>—</td><td>—</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div style="display:flex;gap:12px;">
+              <button onclick="alert('物件情報に登録しました！')" style="flex:1;padding:12px;background:#1F3864;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">
+                <i class="fa-solid fa-check"></i> 確認して物件情報に登録
+              </button>
+              <button onclick="alert('Teaser PDFをダウンロードしています...')" style="flex:1;padding:12px;background:#fff;color:#1F3864;border:1px solid #1F3864;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">
+                <i class="fa-solid fa-file-pdf"></i> Teaser PDFをダウンロード
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== PAGE: HISTORY ===== -->
+      <div id="page-history" class="page">
+        <div style="padding:16px 20px;background:#fff;border-bottom:1px solid #E5E9EF;display:flex;align-items:center;gap:12px;flex-shrink:0;flex-wrap:wrap;">
+          <span style="font-size:12px;color:#64748B;font-weight:600;">用途：</span>
+          <button class="filter-btn active" onclick="historyFilter('all',this)">すべて</button>
+          <button class="filter-btn" onclick="historyFilter('オフィス',this)">オフィス</button>
+          <button class="filter-btn" onclick="historyFilter('住宅',this)">住宅</button>
+          <button class="filter-btn" onclick="historyFilter('商業',this)">商業</button>
+          <div style="margin-left:auto;display:flex;gap:8px;">
+            <button onclick="alert('CSVをダウンロードしています...')" style="padding:6px 14px;background:#fff;border:1px solid #CBD5E1;border-radius:6px;font-size:12px;cursor:pointer;color:#374151;">
+              <i class="fa-solid fa-download"></i> CSVエクスポート
+            </button>
+          </div>
+        </div>
+        <div class="scroll-content" style="padding:20px;">
+          <!-- Stats row -->
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
+            <div class="stat-card"><div class="stat-num" style="color:#1F6B3A;">15</div><div class="stat-label">総取引件数</div></div>
+            <div class="stat-card"><div class="stat-num">4.3%</div><div class="stat-label">平均NOI利回り</div></div>
+            <div class="stat-card"><div class="stat-num">38億円</div><div class="stat-label">平均取引価格</div></div>
+            <div class="stat-card"><div class="stat-num">3,810㎡</div><div class="stat-label">平均延床面積</div></div>
+          </div>
+          <!-- Table -->
+          <div style="background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,0.07);overflow:hidden;">
+            <div style="padding:14px 16px;border-bottom:1px solid #F1F5F9;font-size:14px;font-weight:700;color:#1F3864;">取引事例一覧</div>
+            <div style="overflow-x:auto;">
+              <table class="data-table" id="historyTable">
+                <thead><tr><th>物件名</th><th>エリア</th><th>用途</th><th>成約価格</th><th>NOI利回り</th><th>NCF利回り</th><th>延床面積</th><th>成約日</th></tr></thead>
+                <tbody id="historyBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end pages container -->
+  </div><!-- end main content -->
+</div><!-- end app -->
+<!-- ==================== MODALS ==================== -->
+<!-- Offer Modal -->
+<div id="offerModal" class="modal-bg" onclick="if(event.target===this)closeModal('offerModal')">
+  <div class="modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div style="font-size:18px;font-weight:700;color:#1F3864;" id="offerModalTitle">売却オファーを送る</div>
+      <button onclick="closeModal('offerModal')" style="background:none;border:none;cursor:pointer;color:#94A3B8;font-size:20px;">✕</button>
+    </div>
+    <div id="offerModalContent"></div>
+  </div>
+</div>
+
+<!-- Receive Offer Modal -->
+<div id="receiveModal" class="modal-bg" onclick="if(event.target===this)closeModal('receiveModal')">
+  <div class="modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div style="font-size:18px;font-weight:700;color:#1F3864;">売却オファーの受信</div>
+      <button onclick="closeModal('receiveModal')" style="background:none;border:none;cursor:pointer;color:#94A3B8;font-size:20px;">✕</button>
+    </div>
+    <div id="receiveModalContent"></div>
+  </div>
+</div>
+
+<!-- ==================== JAVASCRIPT ==================== -->
+<script>
+// ========================================================
+// DATA (50 properties)
+// ========================================================
+const PROPERTIES = [
+  {id:1,name:"丸の内センタービル",addr:"千代田区丸の内1-2-3",ward:"千代田区",type:"オフィス",status:"owned",lat:35.6842,lng:139.7671,price:5200,area:3850,floors:12,built:2008,noi:234,ncf:218,noiy:4.50,ncfy:4.19,occ:95.2,tenants:8,monthly:21500,locked:false},
+  {id:2,name:"赤坂パークタワー",addr:"港区赤坂3-5-1",ward:"港区",type:"オフィス",status:"owned",lat:35.6733,lng:139.7364,price:3800,area:2680,floors:10,built:2012,noi:159.6,ncf:147.2,noiy:4.20,ncfy:3.87,occ:97.0,tenants:5,monthly:14500,locked:false},
+  {id:3,name:"新宿ガーデンレジデンス",addr:"新宿区西新宿2-8-1",ward:"新宿区",type:"住宅",status:"owned",lat:35.6938,lng:139.6915,price:1800,area:2150,floors:18,built:2015,noi:68.4,ncf:62.1,noiy:3.80,ncfy:3.45,occ:98.5,tenants:42,monthly:5800,locked:false},
+  {id:4,name:"渋谷スクエアモール",addr:"渋谷区道玄坂1-12-1",ward:"渋谷区",type:"商業",status:"owned",lat:35.6582,lng:139.6987,price:2500,area:1820,floors:6,built:2010,noi:127.5,ncf:115.8,noiy:5.10,ncfy:4.63,occ:100.0,tenants:12,monthly:11200,locked:false},
+  {id:5,name:"品川テクノスクエア",addr:"品川区大崎1-11-1",ward:"品川区",type:"オフィス",status:"owned",lat:35.6190,lng:139.7280,price:4200,area:3100,floors:11,built:2009,noi:201.6,ncf:188.5,noiy:4.80,ncfy:4.49,occ:94.5,tenants:6,monthly:17800,locked:false},
+  {id:6,name:"湊コート中央",addr:"中央区湊2-3-5",ward:"中央区",type:"住宅",status:"owned",lat:35.6706,lng:139.7830,price:1200,area:1480,floors:14,built:2016,noi:43.2,ncf:39.8,noiy:3.60,ncfy:3.32,occ:97.8,tenants:28,monthly:3700,locked:false},
+  {id:7,name:"池袋サウスプラザ",addr:"豊島区南池袋1-16-15",ward:"豊島区",type:"商業",status:"owned",lat:35.7261,lng:139.7152,price:800,area:920,floors:5,built:2005,noi:44.0,ncf:40.1,noiy:5.50,ncfy:5.01,occ:96.0,tenants:8,monthly:3800,locked:false},
+  {id:8,name:"三軒茶屋ハイム",addr:"世田谷区太子堂4-1-2",ward:"世田谷区",type:"住宅",status:"owned",lat:35.6465,lng:139.6712,price:900,area:1120,floors:10,built:2014,noi:36.0,ncf:32.9,noiy:4.00,ncfy:3.66,occ:99.0,tenants:22,monthly:3100,locked:false},
+  {id:9,name:"東雲ビジネスパーク",addr:"江東区東雲1-7-12",ward:"江東区",type:"オフィス",status:"owned",lat:35.6418,lng:139.8074,price:2800,area:2240,floors:9,built:2011,noi:145.6,ncf:134.2,noiy:5.20,ncfy:4.79,occ:93.0,tenants:10,monthly:12500,locked:false},
+  {id:10,name:"中目黒レジデンス",addr:"目黒区上目黒2-1-3",ward:"目黒区",type:"住宅",status:"owned",lat:35.6444,lng:139.6985,price:1400,area:1680,floors:12,built:2017,noi:54.6,ncf:49.8,noiy:3.90,ncfy:3.56,occ:98.0,tenants:32,monthly:4700,locked:false},
+  {id:11,name:"大手町ファーストビル",addr:"千代田区大手町1-1-1",ward:"千代田区",type:"オフィス",status:"sale",lat:35.6862,lng:139.7661,price:7500,area:5200,floors:15,built:2006,noi:307.5,ncf:285.2,noiy:4.10,ncfy:3.80,occ:96.5,tenants:11,monthly:27000,locked:false},
+  {id:12,name:"六本木コマーシャルプラザ",addr:"港区六本木6-10-1",ward:"港区",type:"商業",status:"sale",lat:35.6628,lng:139.7314,price:4800,area:2950,floors:8,built:2007,noi:254.4,ncf:235.2,noiy:5.30,ncfy:4.90,occ:98.0,tenants:15,monthly:22000,locked:false},
+  {id:13,name:"西新宿タワーレジデンス",addr:"新宿区西新宿6-14-1",ward:"新宿区",type:"住宅",status:"sale",lat:35.6958,lng:139.6895,price:2200,area:2480,floors:22,built:2018,noi:81.4,ncf:74.2,noiy:3.70,ncfy:3.37,occ:97.5,tenants:51,monthly:6900,locked:false},
+  {id:14,name:"恵比寿ガーデンオフィス",addr:"渋谷区恵比寿4-20-3",ward:"渋谷区",type:"オフィス",status:"sale",lat:35.6472,lng:139.7102,price:5500,area:3680,floors:12,built:2013,noi:236.5,ncf:218.9,noiy:4.30,ncfy:3.98,occ:95.8,tenants:7,monthly:20800,locked:true},
+  {id:15,name:"大崎ブライトコート",addr:"品川区大崎2-1-1",ward:"品川区",type:"住宅",status:"sale",lat:35.6112,lng:139.7248,price:1600,area:1920,floors:16,built:2016,noi:65.6,ncf:59.8,noiy:4.10,ncfy:3.74,occ:98.2,tenants:38,monthly:5600,locked:true},
+  {id:16,name:"日本橋ビジネスセンター",addr:"中央区日本橋1-3-13",ward:"中央区",type:"オフィス",status:"sale",lat:35.6816,lng:139.7740,price:6800,area:4850,floors:14,built:2008,noi:272.0,ncf:250.8,noiy:4.00,ncfy:3.69,occ:94.2,tenants:9,monthly:24200,locked:true},
+  {id:17,name:"表参道ショッピングコート",addr:"港区北青山3-5-12",ward:"港区",type:"商業",status:"sale",lat:35.6658,lng:139.7148,price:3200,area:1950,floors:6,built:2011,noi:185.6,ncf:170.8,noiy:5.80,ncfy:5.34,occ:100.0,tenants:10,monthly:16400,locked:true},
+  {id:18,name:"目黒ガーデンレジデンス",addr:"目黒区目黒2-10-8",ward:"目黒区",type:"住宅",status:"sale",lat:35.6334,lng:139.7025,price:1900,area:2280,floors:15,built:2019,noi:79.8,ncf:72.2,noiy:4.20,ncfy:3.80,occ:99.1,tenants:44,monthly:6800,locked:true},
+  {id:19,name:"上野パークサイドプラザ",addr:"台東区上野2-14-1",ward:"台東区",type:"商業",status:"sale",lat:35.7096,lng:139.7740,price:1500,area:1180,floors:7,built:2004,noi:88.5,ncf:80.2,noiy:5.90,ncfy:5.35,occ:95.5,tenants:11,monthly:7800,locked:true},
+  {id:20,name:"錦糸町スクエアタワー",addr:"墨田区江東橋4-27-14",ward:"墨田区",type:"オフィス",status:"sale",lat:35.6961,lng:139.8154,price:2400,area:2100,floors:10,built:2010,noi:122.4,ncf:112.5,noiy:5.10,ncfy:4.69,occ:93.8,tenants:8,monthly:10800,locked:true},
+  {id:21,name:"豊洲センタービル",addr:"江東区豊洲3-7-27",ward:"江東区",type:"オフィス",status:"sale",lat:35.6548,lng:139.7984,price:3500,area:2780,floors:11,built:2015,noi:161.0,ncf:148.2,noiy:4.60,ncfy:4.23,occ:96.2,tenants:6,monthly:14200,locked:true},
+  {id:22,name:"自由が丘コマーシャルビル",addr:"目黒区自由が丘2-9-6",ward:"目黒区",type:"商業",status:"sale",lat:35.6074,lng:139.6681,price:1200,area:880,floors:5,built:2008,noi:73.2,ncf:66.8,noiy:6.10,ncfy:5.57,occ:100.0,tenants:7,monthly:6500,locked:true},
+  {id:23,name:"五反田テクノセンター",addr:"品川区西五反田2-11-8",ward:"品川区",type:"オフィス",status:"sale",lat:35.6240,lng:139.7231,price:2900,area:2380,floors:9,built:2012,noi:145.0,ncf:132.8,noiy:5.00,ncfy:4.58,occ:92.5,tenants:12,monthly:12800,locked:true},
+  {id:24,name:"中野ブロードウェイタワー",addr:"中野区中野5-52-15",ward:"中野区",type:"商業",status:"sale",lat:35.7075,lng:139.6635,price:980,area:920,floors:5,built:2003,noi:55.9,ncf:50.8,noiy:5.70,ncfy:5.18,occ:97.8,tenants:9,monthly:4900,locked:true},
+  {id:25,name:"世田谷リバーサイドコート",addr:"世田谷区玉川1-18-1",ward:"世田谷区",type:"住宅",status:"sale",lat:35.6108,lng:139.6412,price:1100,area:1380,floors:11,built:2020,noi:47.3,ncf:43.1,noiy:4.30,ncfy:3.92,occ:99.5,tenants:26,monthly:4100,locked:true},
+  {id:26,name:"北千住イーストプラザ",addr:"足立区千住2-62",ward:"足立区",type:"商業",status:"sale",lat:35.7481,lng:139.8046,price:850,area:1020,floors:6,built:2007,noi:52.7,ncf:47.2,noiy:6.20,ncfy:5.55,occ:96.0,tenants:10,monthly:4700,locked:true},
+  {id:27,name:"荻窪グランドレジデンス",addr:"杉並区荻窪5-27-8",ward:"杉並区",type:"住宅",status:"sale",lat:35.7014,lng:139.6207,price:750,area:950,floors:9,built:2018,noi:33.8,ncf:30.5,noiy:4.50,ncfy:4.07,occ:98.8,tenants:18,monthly:2900,locked:true},
+  {id:28,name:"巣鴨ヴィレッジコート",addr:"豊島区巣鴨3-14-5",ward:"豊島区",type:"住宅",status:"sale",lat:35.7368,lng:139.7292,price:680,area:840,floors:8,built:2016,noi:32.6,ncf:29.4,noiy:4.80,ncfy:4.32,occ:97.5,tenants:16,monthly:2800,locked:true},
+  {id:29,name:"亀戸クロスモール",addr:"江東区亀戸6-57-1",ward:"江東区",type:"商業",status:"sale",lat:35.6878,lng:139.8268,price:1350,area:1560,floors:4,built:2006,noi:75.6,ncf:68.4,noiy:5.60,ncfy:5.07,occ:94.2,tenants:14,monthly:6700,locked:true},
+  {id:30,name:"蒲田ウエストタワー",addr:"大田区西蒲田7-49-1",ward:"大田区",type:"住宅",status:"sale",lat:35.5647,lng:139.7161,price:620,area:780,floors:10,built:2017,noi:28.5,ncf:25.8,noiy:4.60,ncfy:4.16,occ:98.0,tenants:15,monthly:2500,locked:true},
+  {id:31,name:"清澄白河アートコート",addr:"江東区清澄2-4-9",ward:"江東区",type:"住宅",status:"sale",lat:35.6778,lng:139.8014,price:890,area:1080,floors:11,built:2021,noi:39.2,ncf:35.6,noiy:4.40,ncfy:4.00,occ:99.2,tenants:21,monthly:3400,locked:true},
+  {id:32,name:"池上スカイレジデンス",addr:"大田区池上2-5-3",ward:"大田区",type:"住宅",status:"sale",lat:35.5831,lng:139.7011,price:540,area:680,floors:9,built:2019,noi:25.4,ncf:22.8,noiy:4.70,ncfy:4.22,occ:97.8,tenants:13,monthly:2200,locked:true},
+  {id:33,name:"新小岩コマーシャルセンター",addr:"葛飾区新小岩1-48-1",ward:"葛飾区",type:"商業",status:"sale",lat:35.7097,lng:139.8618,price:720,area:890,floors:5,built:2009,noi:45.4,ncf:40.8,noiy:6.30,ncfy:5.67,occ:95.5,tenants:8,monthly:4000,locked:true},
+  {id:34,name:"王子ノースビジネス",addr:"北区王子1-1-1",ward:"北区",type:"オフィス",status:"sale",lat:35.7531,lng:139.7386,price:1100,area:1280,floors:7,built:2011,noi:58.3,ncf:53.1,noiy:5.30,ncfy:4.83,occ:91.5,tenants:9,monthly:5200,locked:true},
+  {id:35,name:"月島リバーフロント",addr:"中央区月島3-25-3",ward:"中央区",type:"住宅",status:"sale",lat:35.6556,lng:139.7820,price:1650,area:1980,floors:16,built:2020,noi:62.7,ncf:57.0,noiy:3.80,ncfy:3.45,occ:99.5,tenants:38,monthly:5400,locked:true},
+  {id:36,name:"大手町プレミアムタワー",addr:"千代田区大手町2-6-1",ward:"千代田区",type:"オフィス",status:"case",lat:35.6882,lng:139.7651,price:12000,area:8500,floors:20,built:2004,noi:456.0,ncf:421.2,noiy:3.80,ncfy:3.51,occ:97.0,tenants:14,monthly:40200,locked:false,closed:"2024年9月"},
+  {id:37,name:"六本木ヒルズサイドコート",addr:"港区六本木6-11-1",ward:"港区",type:"住宅",status:"case",lat:35.6618,lng:139.7294,price:4500,area:4200,floors:25,built:2010,noi:157.5,ncf:144.9,noiy:3.50,ncfy:3.22,occ:99.0,tenants:82,monthly:13500,locked:false,closed:"2024年7月"},
+  {id:38,name:"新宿ウエストゲートビル",addr:"新宿区西新宿1-26-2",ward:"新宿区",type:"オフィス",status:"case",lat:35.6918,lng:139.6975,price:3800,area:2820,floors:11,built:2009,noi:167.2,ncf:153.8,noiy:4.40,ncfy:4.05,occ:95.5,tenants:8,monthly:14800,locked:false,closed:"2024年6月"},
+  {id:39,name:"恵比寿プライムプラザ",addr:"渋谷区恵比寿1-20-18",ward:"渋谷区",type:"商業",status:"case",lat:35.6462,lng:139.7082,price:5200,area:2780,floors:9,built:2012,noi:270.4,ncf:248.4,noiy:5.20,ncfy:4.78,occ:100.0,tenants:13,monthly:23900,locked:false,closed:"2024年5月"},
+  {id:40,name:"品川シーサイドタワー",addr:"品川区東品川4-12-8",ward:"品川区",type:"オフィス",status:"case",lat:35.6210,lng:139.7400,price:8800,area:6200,floors:17,built:2007,noi:360.8,ncf:332.4,noiy:4.10,ncfy:3.78,occ:96.8,tenants:12,monthly:31900,locked:false,closed:"2024年3月"},
+  {id:41,name:"兜町ファイナンシャルビル",addr:"中央区日本橋兜町2-1",ward:"中央区",type:"オフィス",status:"case",lat:35.6816,lng:139.7760,price:6500,area:4680,floors:13,built:2006,noi:273.0,ncf:251.4,noiy:4.20,ncfy:3.87,occ:94.8,tenants:10,monthly:24100,locked:false,closed:"2023年12月"},
+  {id:42,name:"青山グランドコート",addr:"港区南青山5-18-1",ward:"港区",type:"住宅",status:"case",lat:35.6618,lng:139.7214,price:2800,area:2980,floors:18,built:2014,noi:100.8,ncf:92.4,noiy:3.60,ncfy:3.30,occ:98.8,tenants:56,monthly:8700,locked:false,closed:"2023年11月"},
+  {id:43,name:"渋谷キャストスクエア",addr:"渋谷区渋谷1-24-12",ward:"渋谷区",type:"商業",status:"case",lat:35.6602,lng:139.7036,price:3600,area:2280,floors:8,built:2015,noi:194.4,ncf:178.2,noiy:5.40,ncfy:4.95,occ:100.0,tenants:11,monthly:17200,locked:false,closed:"2023年10月"},
+  {id:44,name:"芝公園ビジネスセンター",addr:"港区芝公園2-4-1",ward:"港区",type:"オフィス",status:"case",lat:35.6581,lng:139.7474,price:4200,area:3120,floors:11,built:2010,noi:189.0,ncf:173.9,noiy:4.50,ncfy:4.14,occ:93.5,tenants:7,monthly:16700,locked:false,closed:"2023年9月"},
+  {id:45,name:"浅草リバービュープラザ",addr:"台東区浅草2-1-1",ward:"台東区",type:"商業",status:"case",lat:35.7116,lng:139.7960,price:1800,area:1420,floors:7,built:2008,noi:104.4,ncf:95.4,noiy:5.80,ncfy:5.30,occ:97.2,tenants:12,monthly:9200,locked:false,closed:"2023年7月"},
+  {id:46,name:"清澄白河ロジコマーシャル",addr:"江東区清澄3-11-3",ward:"江東区",type:"商業",status:"case",lat:35.6748,lng:139.8034,price:2300,area:2680,floors:5,built:2013,noi:128.8,ncf:117.2,noiy:5.60,ncfy:5.10,occ:96.0,tenants:9,monthly:11400,locked:false,closed:"2023年5月"},
+  {id:47,name:"二子玉川グランドレジデンス",addr:"世田谷区玉川2-21-1",ward:"世田谷区",type:"住宅",status:"case",lat:35.6088,lng:139.6272,price:3200,area:3480,floors:22,built:2016,noi:121.6,ncf:111.4,noiy:3.80,ncfy:3.48,occ:99.4,tenants:66,monthly:10500,locked:false,closed:"2023年4月"},
+  {id:48,name:"目黒プレミアコート",addr:"目黒区中目黒4-1-28",ward:"目黒区",type:"住宅",status:"case",lat:35.6384,lng:139.6965,price:1900,area:2180,floors:14,built:2018,noi:77.9,ncf:71.3,noiy:4.10,ncfy:3.75,occ:99.0,tenants:42,monthly:6700,locked:false,closed:"2023年2月"},
+  {id:49,name:"池袋イーストタワー",addr:"豊島区東池袋1-2-1",ward:"豊島区",type:"オフィス",status:"case",lat:35.7312,lng:139.7232,price:2500,area:1980,floors:10,built:2011,noi:117.5,ncf:108.0,noiy:4.70,ncfy:4.32,occ:94.0,tenants:8,monthly:10400,locked:false,closed:"2022年12月"},
+  {id:50,name:"武蔵小山センタービル",addr:"品川区小山3-23-5",ward:"品川区",type:"商業",status:"case",lat:35.6280,lng:139.7031,price:1100,area:980,floors:5,built:2009,noi:60.5,ncf:55.0,noiy:5.50,ncfy:5.00,occ:98.5,tenants:8,monthly:5400,locked:false,closed:"2022年11月"},
+];
+
+// Track unlocked properties
+const unlocked = new Set([11,12,13]);
+
+// ========================================================
+// HELPERS
+// ========================================================
+function fmt(n){return (n).toLocaleString('ja-JP');}
+function fmtM(n){
+  if(n>=10000) return Math.floor(n/10000)+'億'+(n%10000?Math.floor((n%10000)/1000)+'千':'')+'万円';
+  if(n>=1000) return Math.floor(n/1000)+'億'+(n%1000?n%1000+'百':'')+'万円';
+  return n+'百万円';
+}
+function fmtMSimple(n){
+  if(n>=10000) return (n/10000).toFixed(1)+'億円';
+  return n+'百万円';
+}
+function typeTag(t){
+  if(t==='オフィス') return '<span class="tag tag-office">オフィス</span>';
+  if(t==='住宅') return '<span class="tag tag-res">住宅</span>';
+  return '<span class="tag tag-com">商業</span>';
+}
+function statusTag(s){
+  if(s==='owned') return '<span class="tag tag-owned">保有物件</span>';
+  if(s==='sale') return '<span class="tag tag-sale">売却物件</span>';
+  return '<span class="tag tag-case">取引事例</span>';
+}
+function statusLabel(s){
+  if(s==='owned') return '保有物件';
+  if(s==='sale') return '売却物件';
+  return '取引事例';
+}
+function pinColor(s){
+  if(s==='owned') return '#1F3864';
+  if(s==='sale') return '#C00000';
+  return '#1F6B3A';
+}
+
+// ========================================================
+// NAVIGATION
+// ========================================================
+function showPage(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('#sidebar nav a').forEach(a=>a.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  const nav = document.getElementById('nav-'+name);
+  if(nav) nav.classList.add('active');
+  const titles = {map:'ダッシュボード',list:'物件一覧',detail:'物件詳細',offers:'オファー管理',ai:'AIアシスタント',history:'取引事例DB'};
+  document.getElementById('pageTitle').textContent = titles[name]||name;
+  if(name==='map' && !mapInit) initMap();
+  if(name==='list') renderList();
+  if(name==='offers') renderOffers();
+  if(name==='history') renderHistory();
+}
+
+// ========================================================
+// LOGIN
+// ========================================================
+function doLogin(){
+  document.getElementById('loginPage').style.display='none';
+  document.getElementById('app').style.display='flex';
+  setTimeout(()=>{ if(!mapInit) initMap(); },100);
+}
+
+// ========================================================
+// MAP
+// ========================================================
+let map=null, mapInit=false, markers=[];
+let activeMapFilter='all';
+
+function initMap(){
+  map = L.map('map',{zoomControl:true}).setView([35.675,139.745],12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap contributors',maxZoom:19
+  }).addTo(map);
+  addAllMarkers();
+  mapInit=true;
+}
+
+function createPinIcon(status){
+  const c = pinColor(status);
+  return L.divIcon({
+    className:'',
+    html:`<div style="width:18px;height:18px;background:${c};border:3px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>`,
+    iconSize:[18,18],iconAnchor:[9,9],popupAnchor:[0,-12]
+  });
+}
+
+function addAllMarkers(){
+  markers.forEach(m=>m.remove());
+  markers=[];
+  const filtered = PROPERTIES.filter(p=>{
+    if(activeMapFilter==='all') return true;
+    if(activeMapFilter==='owned'||activeMapFilter==='sale'||activeMapFilter==='case') return p.status===activeMapFilter;
+    return p.type===activeMapFilter;
+  });
+  filtered.forEach(p=>{
+    const m = L.marker([p.lat,p.lng],{icon:createPinIcon(p.status)})
+      .addTo(map)
+      .bindPopup(makePopup(p),{maxWidth:260});
+    m.on('click',()=>m.openPopup());
+    markers.push(m);
+  });
+}
+
+function makePopup(p){
+  const isLocked = p.status==='sale' && !unlocked.has(p.id);
+  return `<div style="font-family:inherit;min-width:220px;">
+    <div style="font-size:13px;font-weight:700;color:#1F3864;margin-bottom:6px;">${p.name}</div>
+    <div style="font-size:11px;color:#64748B;margin-bottom:8px;">${p.addr}</div>
+    <div style="display:flex;gap:6px;margin-bottom:8px;">${typeTag(p.type)} ${statusTag(p.status)}</div>
+    ${isLocked?`
+      <div style="background:#FFF3E0;border-radius:6px;padding:8px;font-size:11px;color:#C55A11;text-align:center;margin-bottom:8px;">
+        <i class="fa-solid fa-lock"></i> オファー受諾後に詳細閲覧可
+      </div>
+      <div style="font-size:12px;color:#374151;"><b>価格：</b>非公開</div>
+    `:
+    `<div style="font-size:12px;color:#374151;margin-bottom:4px;"><b>価格：</b>${fmtMSimple(p.price)}</div>
+    <div style="font-size:12px;color:#374151;margin-bottom:4px;"><b>NOI利回：</b>${p.noiy.toFixed(2)}%</div>
+    <div style="font-size:12px;color:#374151;"><b>延床面積：</b>${fmt(p.area)}㎡</div>`}
+    <button onclick="showDetail(${p.id})" style="width:100%;margin-top:10px;padding:7px;background:#1F3864;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+      ${isLocked?'オファーを確認':'詳細を見る'}
+    </button>
+  </div>`;
+}
+
+function mapFilter(f,btn){
+  activeMapFilter=f;
+  document.querySelectorAll('#page-map .filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  addAllMarkers();
+}
+
+// ========================================================
+// PROPERTY LIST
+// ========================================================
+let listFilters={status:'all',type:'all'};
+
+function listFilter(key,val,btn){
+  listFilters[key]=val;
+  const group = key==='status'?[0,1,2,3]:[4,5,6,7];
+  const btns=document.querySelectorAll('#page-list .filter-btn');
+  // Reset same-group buttons
+  const allBtns=Array.from(btns);
+  if(key==='status') allBtns.slice(0,4).forEach(b=>b.classList.remove('active'));
+  else allBtns.slice(4).forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderList();
+}
+
+function renderList(){
+  const filtered = PROPERTIES.filter(p=>{
+    if(listFilters.status!=='all' && p.status!==listFilters.status) return false;
+    if(listFilters.type!=='all' && p.type!==listFilters.type) return false;
+    return true;
+  });
+  document.getElementById('listCount').textContent=`${filtered.length}件表示`;
+  document.getElementById('propGrid').innerHTML = filtered.map(p=>{
+    const isLocked = p.status==='sale' && !unlocked.has(p.id);
+    const borderColor = pinColor(p.status);
+    return `<div class="prop-card" onclick="showDetail(${p.id})" style="border-top:4px solid ${borderColor};">
+      <div class="card-header">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+          <div style="font-size:14px;font-weight:700;color:#1F3864;flex:1;">${p.name}</div>
+          ${isLocked?'<i class="fa-solid fa-lock" style="color:#94A3B8;font-size:14px;flex-shrink:0;"></i>':''}
+        </div>
+        <div style="font-size:11px;color:#94A3B8;margin-top:3px;"><i class="fa-solid fa-location-dot"></i> ${p.ward} / ${p.addr.split(p.ward)[1]||''}</div>
+        <div style="display:flex;gap:6px;margin-top:8px;">${typeTag(p.type)} ${statusTag(p.status)}</div>
+      </div>
+      <div class="card-body">
+        ${isLocked?`
+          <div style="text-align:center;padding:12px 0;color:#94A3B8;font-size:12px;">
+            <i class="fa-solid fa-lock" style="font-size:20px;display:block;margin-bottom:6px;"></i>
+            オファー受諾後に詳細閲覧可能
+          </div>
+        `:`
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div><div style="font-size:11px;color:#94A3B8;">売却価格</div><div style="font-size:14px;font-weight:700;color:#374151;">${fmtMSimple(p.price)}</div></div>
+            <div><div style="font-size:11px;color:#94A3B8;">NOI利回り</div><div style="font-size:14px;font-weight:700;color:#1F6B3A;">${p.noiy.toFixed(2)}%</div></div>
+            <div><div style="font-size:11px;color:#94A3B8;">延床面積</div><div style="font-size:13px;font-weight:600;">${fmt(p.area)}㎡</div></div>
+            <div><div style="font-size:11px;color:#94A3B8;">稼働率</div><div style="font-size:13px;font-weight:600;">${p.occ}%</div></div>
+          </div>
+          ${p.status==='case'?`<div style="margin-top:8px;font-size:11px;color:#1F6B3A;"><i class="fa-solid fa-check-circle"></i> 成約：${p.closed}</div>`:''}
+        `}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ========================================================
+// PROPERTY DETAIL
+// ========================================================
+function showDetail(id){
+  const p = PROPERTIES.find(x=>x.id===id);
+  if(!p) return;
+  const isLocked = p.status==='sale' && !unlocked.has(p.id);
+  document.getElementById('detailBreadcrumb').textContent=p.name;
+  document.getElementById('detailContent').innerHTML = isLocked ? renderLockedDetail(p) : renderUnlockedDetail(p);
+  showPage('detail');
+}
+
+function renderLockedDetail(p){
+  return `<div style="max-width:720px;">
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap;">
+      <div style="font-size:22px;font-weight:800;color:#1F3864;">${p.name}</div>
+      ${typeTag(p.type)} ${statusTag(p.status)}
+    </div>
+    <div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.07);margin-bottom:16px;">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+        <div><div style="font-size:11px;color:#94A3B8;margin-bottom:4px;">所在地</div><div style="font-size:13px;font-weight:600;">${p.addr}</div></div>
+        <div><div style="font-size:11px;color:#94A3B8;margin-bottom:4px;">用途</div><div style="font-size:13px;font-weight:600;">${p.type}</div></div>
+        <div><div style="font-size:11px;color:#94A3B8;margin-bottom:4px;">延床面積</div><div style="font-size:13px;font-weight:600;">${fmt(p.area)}㎡</div></div>
+        <div><div style="font-size:11px;color:#94A3B8;margin-bottom:4px;">階数</div><div style="font-size:13px;font-weight:600;">地上${p.floors}階</div></div>
+        <div><div style="font-size:11px;color:#94A3B8;margin-bottom:4px;">竣工年</div><div style="font-size:13px;font-weight:600;">${p.built}年</div></div>
+        <div><div style="font-size:11px;color:#94A3B8;margin-bottom:4px;">テナント数</div><div style="font-size:13px;font-weight:600;">${p.tenants}社</div></div>
+      </div>
+    </div>
+    <div class="lock-overlay">
+      <i class="fa-solid fa-lock" style="font-size:36px;color:#CBD5E1;margin-bottom:12px;display:block;"></i>
+      <div style="font-size:16px;font-weight:700;color:#374151;margin-bottom:8px;">詳細情報はオファー受諾後に閲覧できます</div>
+      <div style="font-size:13px;color:#64748B;margin-bottom:20px;">価格・収支・レントロール・物件資料は、売主からのオファーを受諾するか、あなたが購入オファーを送って売主が承諾した後に閲覧可能になります。</div>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+        <button onclick="showReceiveOffer(${p.id})" style="padding:12px 28px;background:#1F3864;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">
+          <i class="fa-solid fa-envelope-open"></i> 受信オファーを確認
+        </button>
+        <button onclick="showSendOffer(${p.id})" style="padding:12px 28px;background:#fff;color:#1F3864;border:2px solid #1F3864;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">
+          <i class="fa-solid fa-paper-plane"></i> 購入オファーを送る
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderUnlockedDetail(p){
+  return `<div style="max-width:820px;">
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap;">
+      <div style="font-size:22px;font-weight:800;color:#1F3864;">${p.name}</div>
+      ${typeTag(p.type)} ${statusTag(p.status)}
+      ${p.status==='case'?`<span style="background:#E6F4EC;color:#1F6B3A;padding:3px 10px;border-radius:4px;font-size:12px;font-weight:600;">成約：${p.closed}</span>`:''}
+    </div>
+    <!-- Financial highlights -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
+      <div class="stat-card" style="border-left:4px solid #1F3864;">
+        <div style="font-size:11px;color:#94A3B8;margin-bottom:4px;">売却価格</div>
+        <div style="font-size:20px;font-weight:800;color:#1F3864;">${fmtMSimple(p.price)}</div>
+      </div>
+      <div class="stat-card" style="border-left:4px solid #1F6B3A;">
+        <div style="font-size:11px;color:#94A3B8;margin-bottom:4px;">NOI利回り</div>
+        <div style="font-size:20px;font-weight:800;color:#1F6B3A;">${p.noiy.toFixed(2)}%</div>
+      </div>
+      <div class="stat-card" style="border-left:4px solid #2E75B6;">
+        <div style="font-size:11px;color:#94A3B8;margin-bottom:4px;">NCF利回り</div>
+        <div style="font-size:20px;font-weight:800;color:#2E75B6;">${p.ncfy.toFixed(2)}%</div>
+      </div>
+      <div class="stat-card" style="border-left:4px solid #C55A11;">
+        <div style="font-size:11px;color:#94A3B8;margin-bottom:4px;">稼働率</div>
+        <div style="font-size:20px;font-weight:800;color:#C55A11;">${p.occ}%</div>
+      </div>
+    </div>
+    <!-- Basic info + Financials grid -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+      <div style="background:#fff;border-radius:10px;padding:18px;box-shadow:0 1px 4px rgba(0,0,0,0.07);">
+        <div style="font-size:12px;font-weight:700;color:#1F3864;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #F1F5F9;">物件基本情報</div>
+        <table style="width:100%;font-size:13px;">
+          <tr><td style="color:#64748B;padding:5px 0;width:45%;">所在地</td><td style="font-weight:600;">${p.ward}</td></tr>
+          <tr><td style="color:#64748B;padding:5px 0;">住所</td><td style="font-weight:600;font-size:12px;">${p.addr}</td></tr>
+          <tr><td style="color:#64748B;padding:5px 0;">用途</td><td style="font-weight:600;">${p.type}</td></tr>
+          <tr><td style="color:#64748B;padding:5px 0;">延床面積</td><td style="font-weight:600;">${fmt(p.area)}㎡</td></tr>
+          <tr><td style="color:#64748B;padding:5px 0;">階数</td><td style="font-weight:600;">地上${p.floors}階</td></tr>
+          <tr><td style="color:#64748B;padding:5px 0;">竣工年</td><td style="font-weight:600;">${p.built}年</td></tr>
+        </table>
+      </div>
+      <div style="background:#fff;border-radius:10px;padding:18px;box-shadow:0 1px 4px rgba(0,0,0,0.07);">
+        <div style="font-size:12px;font-weight:700;color:#1F3864;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #F1F5F9;">収支情報（年間）</div>
+        <table style="width:100%;font-size:13px;">
+          <tr><td style="color:#64748B;padding:5px 0;width:50%;">NOI（純収益）</td><td style="font-weight:700;color:#1F6B3A;">¥${fmt(p.noi)}百万</td></tr>
+          <tr><td style="color:#64748B;padding:5px 0;">NCF</td><td style="font-weight:700;color:#2E75B6;">¥${fmt(p.ncf)}百万</td></tr>
+          <tr><td style="color:#64748B;padding:5px 0;">月額賃料収入</td><td style="font-weight:600;">¥${fmt(p.monthly)}万</td></tr>
+          <tr><td style="color:#64748B;padding:5px 0;">テナント数</td><td style="font-weight:600;">${p.tenants}社</td></tr>
+          <tr><td style="color:#64748B;padding:5px 0;">NOI利回り</td><td style="font-weight:700;color:#1F6B3A;">${p.noiy.toFixed(2)}%</td></tr>
+          <tr><td style="color:#64748B;padding:5px 0;">NCF利回り</td><td style="font-weight:700;color:#2E75B6;">${p.ncfy.toFixed(2)}%</td></tr>
+        </table>
+      </div>
+    </div>
+    ${p.status==='sale'?`
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      <button onclick="showSendOffer(${p.id})" style="padding:12px 28px;background:#C00000;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">
+        <i class="fa-solid fa-paper-plane"></i> 購入オファーを送る
+      </button>
+      <button onclick="alert('Teaser PDFをダウンロードしています...')" style="padding:12px 28px;background:#fff;color:#1F3864;border:2px solid #1F3864;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">
+        <i class="fa-solid fa-file-pdf"></i> Teaser DLを請求
+      </button>
+    </div>
+    `:''}
+  </div>`;
+}
+
+// ========================================================
+// OFFERS
+// ========================================================
+const INBOX = [
+  {id:'O001',propId:14,from:'グローバル不動産投資㈱',prop:'恵比寿ガーデンオフィス',date:'2026-04-10',status:'pending',msg:'是非ご検討ください。来週ご面談可能でしょうか。'},
+  {id:'O002',propId:16,from:'東海不動産ファンド㈱',prop:'日本橋ビジネスセンター',date:'2026-04-08',status:'pending',msg:'条件面でご相談させていただければ幸いです。'},
+  {id:'O003',propId:17,from:'パシフィックリアルティ㈱',prop:'表参道ショッピングコート',date:'2026-04-05',status:'pending',msg:'御社物件に強い興味があります。'},
+];
+const SENT = [
+  {id:'S001',propId:36,to:'大手町アセットMGT㈱',prop:'大手町プレミアムタワー（事例参照）',date:'2026-04-09',status:'accepted'},
+  {id:'S002',propId:38,to:'首都圏不動産ファンド㈱',prop:'新宿ウエストゲートビル（事例参照）',date:'2026-04-07',status:'pending'},
+];
+
+function renderOffers(){
+  document.getElementById('inboxList').innerHTML=INBOX.map(o=>`
+    <div style="background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,0.07);border-left:4px solid #C00000;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+        <div style="font-size:13px;font-weight:700;color:#1F3864;">${o.prop}</div>
+        <span style="background:#FFF3E0;color:#C55A11;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">未対応</span>
+      </div>
+      <div style="font-size:12px;color:#64748B;margin-bottom:4px;"><i class="fa-solid fa-building"></i> ${o.from}</div>
+      <div style="font-size:12px;color:#64748B;margin-bottom:8px;"><i class="fa-solid fa-calendar"></i> ${o.date}</div>
+      <div style="font-size:12px;color:#374151;background:#F9FAFB;border-radius:6px;padding:8px;margin-bottom:12px;">"${o.msg}"</div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="acceptOffer('${o.id}',${o.propId})" style="flex:1;padding:8px;background:#1F3864;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+          <i class="fa-solid fa-check"></i> 検討する（詳細解放）
+        </button>
+        <button onclick="alert('見送り済みとしました。')" style="padding:8px 16px;background:#fff;color:#64748B;border:1px solid #CBD5E1;border-radius:6px;font-size:12px;cursor:pointer;">見送り</button>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('sentList').innerHTML=SENT.map(o=>`
+    <div style="background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,0.07);border-left:4px solid ${o.status==='accepted'?'#1F6B3A':'#2E75B6'};">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+        <div style="font-size:13px;font-weight:700;color:#1F3864;">${o.prop}</div>
+        <span style="${o.status==='accepted'?'background:#E6F4EC;color:#1F6B3A':'background:#EBF3FB;color:#2E75B6'};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">${o.status==='accepted'?'承諾済み':'返信待ち'}</span>
+      </div>
+      <div style="font-size:12px;color:#64748B;margin-bottom:4px;"><i class="fa-solid fa-paper-plane"></i> 送信先：${o.to}</div>
+      <div style="font-size:12px;color:#64748B;">${o.date}</div>
+    </div>
+  `).join('');
+}
+
+function acceptOffer(offerId, propId){
+  unlocked.add(propId);
+  document.getElementById('receiveModalContent').innerHTML=`
+    <div style="text-align:center;padding:12px 0;">
+      <div style="font-size:48px;margin-bottom:12px;">🎉</div>
+      <div style="font-size:18px;font-weight:700;color:#1F3864;margin-bottom:8px;">オファーを受諾しました！</div>
+      <div style="font-size:13px;color:#64748B;margin-bottom:24px;">物件の詳細情報（収支・レントロール・資料）の閲覧権限が付与されました。</div>
+      <button onclick="closeModal('receiveModal');showDetail(${propId})" style="width:100%;padding:13px;background:#1F3864;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">
+        <i class="fa-solid fa-arrow-right"></i> 物件詳細を見る
+      </button>
+    </div>`;
+  document.getElementById('receiveModal').classList.add('open');
+}
+
+function showReceiveOffer(propId){
+  const o = INBOX.find(x=>x.propId===propId);
+  const p = PROPERTIES.find(x=>x.id===propId);
+  if(!o){
+    document.getElementById('receiveModalContent').innerHTML=`<div style="color:#64748B;text-align:center;padding:20px;">このオフィスへのオファーはまだ届いていません。<br>購入オファーを送ることができます。</div>`;
+  } else {
+    document.getElementById('receiveModalContent').innerHTML=`
+      <div style="background:#F9FAFB;border-radius:8px;padding:14px;margin-bottom:16px;">
+        <div style="font-size:13px;font-weight:700;color:#1F3864;margin-bottom:8px;">${p?p.name:''}</div>
+        <div style="font-size:12px;color:#64748B;"><b>送信元：</b>${o.from}</div>
+        <div style="font-size:12px;color:#64748B;margin-top:4px;"><b>日時：</b>${o.date}</div>
+        <div style="font-size:12px;color:#374151;margin-top:8px;background:#fff;padding:8px;border-radius:6px;">"${o.msg}"</div>
+      </div>
+      <div style="font-size:13px;color:#374151;margin-bottom:16px;">「検討する」を選択すると、物件の詳細情報（収支・RR・資料）にアクセスできるようになります。</div>
+      <div style="display:flex;gap:10px;">
+        <button onclick="acceptOffer('${o.id}',${propId})" style="flex:1;padding:12px;background:#1F3864;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">
+          <i class="fa-solid fa-check"></i> 検討する
+        </button>
+        <button onclick="closeModal('receiveModal')" style="padding:12px 20px;background:#fff;color:#64748B;border:1px solid #CBD5E1;border-radius:8px;font-size:14px;cursor:pointer;">見送り</button>
+      </div>`;
+  }
+  document.getElementById('receiveModal').classList.add('open');
+}
+
+function showSendOffer(propId){
+  const p = PROPERTIES.find(x=>x.id===propId);
+  document.getElementById('offerModalContent').innerHTML=`
+    <div style="background:#F9FAFB;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;color:#374151;">
+      <b>対象物件：</b>${p?p.name:''}<br>
+      <span style="font-size:12px;color:#64748B;">${p?p.addr:''}</span>
+    </div>
+    <div style="margin-bottom:14px;">
+      <label style="font-size:12px;color:#64748B;font-weight:600;display:block;margin-bottom:6px;">希望購入価格（百万円）</label>
+      <input type="number" placeholder="${p?Math.round(p.price*0.95):''}" style="width:100%;padding:10px 14px;border:1px solid #CBD5E1;border-radius:8px;font-size:14px;">
+    </div>
+    <div style="margin-bottom:20px;">
+      <label style="font-size:12px;color:#64748B;font-weight:600;display:block;margin-bottom:6px;">メッセージ</label>
+      <textarea rows="3" placeholder="購入を希望する旨・条件など..." style="width:100%;padding:10px 14px;border:1px solid #CBD5E1;border-radius:8px;font-size:13px;resize:none;"></textarea>
+    </div>
+    <button onclick="submitOffer(${propId})" style="width:100%;padding:13px;background:#C00000;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">
+      <i class="fa-solid fa-paper-plane"></i> 購入オファーを送信
+    </button>`;
+  document.getElementById('offerModal').classList.add('open');
+}
+
+function submitOffer(propId){
+  closeModal('offerModal');
+  setTimeout(()=>{
+    document.getElementById('receiveModalContent').innerHTML=`
+      <div style="text-align:center;padding:12px 0;">
+        <div style="font-size:48px;margin-bottom:12px;">📨</div>
+        <div style="font-size:18px;font-weight:700;color:#1F3864;margin-bottom:8px;">購入オファーを送信しました</div>
+        <div style="font-size:13px;color:#64748B;margin-bottom:24px;">売主からの返答があり次第、通知でお知らせします。</div>
+        <button onclick="closeModal('receiveModal')" style="width:100%;padding:13px;background:#1F3864;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">閉じる</button>
+      </div>`;
+    document.getElementById('receiveModal').classList.add('open');
+  },200);
+}
+
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+// ========================================================
+// AI DEMO
+// ========================================================
+function startAIDemo(){
+  document.getElementById('aiUpload').style.display='none';
+  document.getElementById('aiSteps').style.display='block';
+  document.getElementById('aiResults').style.display='none';
+  const steps=[
+    {id:'step1',msg:'PMRレポート（15ページ）のテキスト・表データを抽出中...',fill:100,done:'PDFから4,820文字・12テーブルを抽出しました'},
+    {id:'step2',msg:'Claude AIが収支・テナント情報を解析中...',fill:100,done:'NOI・NCF・8テナント分のRRデータを抽出しました'},
+    {id:'step3',msg:'抽出データを物件情報と照合・検証中...',done:'NOI利回り4.50% / 稼働率95.2% を確認・登録準備完了'},
+    {id:'step4',msg:'Teaserテンプレートに情報を組み込んでPDF生成中...',done:'Teaser PDF（2ページ）の生成が完了しました'},
+  ];
+  let i=0;
+  function runStep(){
+    if(i>=steps.length){ document.getElementById('aiResults').style.display='block'; return; }
+    const s=steps[i];
+    const icon=document.getElementById(s.id+'-icon');
+    icon.style.background='#2E75B6'; icon.style.color='#fff'; icon.innerHTML='<i class="fa-solid fa-spinner fa-spin" style="font-size:11px;"></i>';
+    document.getElementById(s.id).classList.add('active');
+    document.getElementById(s.id+'-msg').textContent=s.msg;
+    if(s.fill){
+      document.getElementById(s.id+'-bar').style.display='block';
+      let w=0; const iv=setInterval(()=>{ w+=5; document.getElementById(s.id+'-fill').style.width=w+'%'; if(w>=100)clearInterval(iv); },50);
+    }
+    setTimeout(()=>{
+      icon.innerHTML='<i class="fa-solid fa-check" style="font-size:11px;"></i>'; icon.style.background='#1F6B3A';
+      document.getElementById(s.id).classList.remove('active'); document.getElementById(s.id).classList.add('done');
+      document.getElementById(s.id+'-msg').textContent='✓ '+s.done;
+      i++; setTimeout(runStep,400);
+    },s.fill?1200:900);
+  }
+  runStep();
+}
+
+// ========================================================
+// HISTORY
+// ========================================================
+let historyTypeFilter='all';
+function historyFilter(f,btn){
+  historyTypeFilter=f;
+  document.querySelectorAll('#page-history .filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderHistory();
+}
+function renderHistory(){
+  const data=PROPERTIES.filter(p=>p.status==='case' && (historyTypeFilter==='all'||p.type===historyTypeFilter));
+  document.getElementById('historyBody').innerHTML=data.map(p=>`
+    <tr onclick="showDetail(${p.id})" style="cursor:pointer;">
+      <td><b>${p.name}</b></td>
+      <td>${p.ward}</td>
+      <td>${typeTag(p.type)}</td>
+      <td style="font-weight:700;">${fmtMSimple(p.price)}</td>
+      <td style="color:#1F6B3A;font-weight:700;">${p.noiy.toFixed(2)}%</td>
+      <td style="color:#2E75B6;font-weight:700;">${p.ncfy.toFixed(2)}%</td>
+      <td>${fmt(p.area)}㎡</td>
+      <td>${p.closed}</td>
+    </tr>
+  `).join('');
+}
+
+// ========================================================
+// INIT
+// ========================================================
+document.addEventListener('DOMContentLoaded',()=>{
+  // Login page is shown by default; app starts after doLogin()
+});
+</script>
+</body>
+</html>
