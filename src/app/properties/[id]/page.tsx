@@ -7,7 +7,7 @@ import {
   type Property,
   type PropertyStatus,
 } from '@/types'
-import { formatPrice, formatYield, formatArea, formatNumber } from '@/lib/format'
+import { formatPropertyPrice, formatPrice, formatYield, formatArea, formatNumber } from '@/lib/format'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -94,9 +94,11 @@ export default async function PropertyDetailPage({
 
         {isOwner && (
           <div className="flex gap-2">
-            <Link href={`/properties/${p.id}/edit`}>
-              <Button variant="outline" size="sm">編集</Button>
-            </Link>
+            {(p.status === 'draft' || p.status === 'pending_approval') && (
+              <Link href={`/properties/${p.id}/edit`}>
+                <Button variant="outline" size="sm">編集</Button>
+              </Link>
+            )}
             <PropertyStatusActions propertyId={p.id} currentStatus={p.status} />
           </div>
         )}
@@ -108,7 +110,7 @@ export default async function PropertyDetailPage({
           {/* 価格・利回り */}
           <InfoCard title="価格・利回り">
             <MetricGrid>
-              <Metric label="売却希望価格" value={formatPrice(p.price)} highlight />
+              <Metric label="売却希望価格" value={formatPropertyPrice(p.price)} highlight />
               <Metric label="NOI利回り" value={formatYield(p.noi_yield)} />
               <Metric label="NCF利回り" value={formatYield(p.ncf_yield)} />
               <Metric label="専有坪単価" value={

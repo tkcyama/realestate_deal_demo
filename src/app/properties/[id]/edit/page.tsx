@@ -1,23 +1,27 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { geocodeAddress } from '@/lib/geocoding'
 import { normalizeAddress } from '@/lib/normalize'
-import { USE_TYPE_LABELS, type PropertyUse } from '@/types'
+import { USE_TYPE_LABELS, type Property, type PropertyUse } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 const posNum = () =>
-  z.string().refine((v) => v === '' || (Number(v) > 0), '正の数を入力してください')
+  z.string().refine((v) => v === '' || Number(v) > 0, '正の数を入力してください')
 const intNum = (min = 0) =>
-  z.string().refine((v) => v === '' || (Number.isInteger(Number(v)) && Number(v) >= min), `${min}以上の整数を入力してください`)
+  z.string().refine(
+    (v) => v === '' || (Number.isInteger(Number(v)) && Number(v) >= min),
+    `${min}以上の整数を入力してください`
+  )
 
 const schema = z.object({
   name: z.string().min(1, '物件名を入力してください'),
@@ -28,7 +32,7 @@ const schema = z.object({
   nearest_line: z.string().optional(),
   nearest_station: z.string().optional(),
   walk_minutes: intNum(1),
-  use_type: z.enum(['office','residential','commercial','logistics','hotel','mixed','other']),
+  use_type: z.enum(['office', 'residential', 'commercial', 'logistics', 'hotel', 'mixed', 'other']),
   building_year: intNum(1900),
   structure: z.string().optional(),
   floors_above: intNum(0),
@@ -75,23 +79,91 @@ const FIELD_LABELS: Partial<Record<keyof FormData, string>> = {
   occupancy_rate: '稼働率（%）',
 }
 
-export default function NewPropertyPage() {
+function str(v: number | null | undefined) {
+  return v != null ? String(v) : ''
+}
+
+export default function EditPropertyPage() {
   const router = useRouter()
+  const { id } = useParams<{ id: string }>()
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [geocoding, setGeocoding] = useState(false)
   const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const [addressChanged, setAddressChanged] = useState(false)
+  const [originalAddress, setOriginalAddress] = useState('')
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
-    resolver: zodResolver(schema),
-    defaultValues: { use_type: 'office' },
-  })
+  const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } =
+    useForm<FormData>({ resolver: zodResolver(schema) })
+
+  // 住所フィールドを監視して変化を検知
+  const watchedAddress = watch(['prefecture', 'city', 'town', 'address_detail'])
+
+  useEffect(() => {
+    const current = watchedAddress.filter(Boolean).join('')
+    if (originalAddress && current !== originalAddress) {
+      setAddressChanged(true)
+    }
+  }, [watchedAddress, originalAddress])
+
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/auth/login'); return }
+
+      const { data: property, error } = await supabase
+        .from('properties')
+        .select('*')
+        .eq('id', id)
+        .is('deleted_at', null)
+        .single()
+
+      if (error || !property) { setError('物件が見つかりません'); setLoading(false); return }
+      if (property.seller_id !== user.id) { router.push(`/properties/${id}`); return }
+      if (property.status === 'published' || property.status === 'sold') {
+        setError('公開中または売却完了の物件は編集できません')
+        setLoading(false)
+        return
+      }
+
+      const p = property as Property
+      const addr = [p.prefecture, p.city, p.town, p.address_detail].filter(Boolean).join('')
+      setOriginalAddress(addr)
+
+      reset({
+        name: p.name,
+        prefecture: p.prefecture ?? '',
+        city: p.city ?? '',
+        town: p.town ?? '',
+        address_detail: p.address_detail ?? '',
+        nearest_line: p.nearest_line ?? '',
+        nearest_station: p.nearest_station ?? '',
+        walk_minutes: str(p.walk_minutes),
+        use_type: p.use_type,
+        building_year: str(p.building_year),
+        structure: p.structure ?? '',
+        floors_above: str(p.floors_above),
+        floors_below: str(p.floors_below),
+        land_area_sqm: str(p.land_area_sqm),
+        total_floor_area_sqm: str(p.total_floor_area_sqm),
+        exclusive_area_tsubo: str(p.exclusive_area_tsubo),
+        price: str(parseFloat((p.price / 1_0000_0000).toFixed(4))),
+        noi: str(p.noi),
+        ncf: str(p.ncf),
+        tenant_count: str(p.tenant_count),
+        occupancy_rate: str(p.occupancy_rate),
+        monthly_rent_income: str(p.monthly_rent_income),
+      })
+      setLoading(false)
+    }
+    load()
+  }, [id, router, reset])
 
   async function save(data: FormData, status: 'draft' | 'pending_approval') {
     setError(null)
     setValidationErrors([])
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
 
     // 住所正規化（漢数字・全角数字 → 半角）
     const prefecture = normalizeAddress(data.prefecture)
@@ -99,33 +171,30 @@ export default function NewPropertyPage() {
     const town = normalizeAddress(data.town)
     const address_detail = data.address_detail ? normalizeAddress(data.address_detail) : ''
 
-    // Geocoding
-    const address = [prefecture, city, town, address_detail]
-      .filter(Boolean).join('')
-    setGeocoding(true)
-    const coords = await geocodeAddress(address)
-    setGeocoding(false)
+    const address = [prefecture, city, town, address_detail].filter(Boolean).join('')
 
-    const exclusive_area_tsubo = data.exclusive_area_tsubo
-      ? Number(data.exclusive_area_tsubo) : null
+    let coords: { lat: number; lng: number } | null = null
+    if (addressChanged) {
+      setGeocoding(true)
+      coords = await geocodeAddress(address)
+      setGeocoding(false)
+    }
+
+    const exclusive_area_tsubo = data.exclusive_area_tsubo ? Number(data.exclusive_area_tsubo) : null
     // 入力は億円単位 → 円に変換して保存
     const price = Math.round(Number(data.price) * 1_0000_0000)
-    const exclusive_tsubo_price =
-      exclusive_area_tsubo ? Math.round(price / exclusive_area_tsubo) : null
+    const exclusive_tsubo_price = exclusive_area_tsubo ? Math.round(price / exclusive_area_tsubo) : null
     // NOI・NCF・月額賃料は円単位のまま
     const noi = data.noi ? Number(data.noi) : null
     const ncf = data.ncf ? Number(data.ncf) : null
 
-    const payload = {
-      seller_id: user.id,
+    const payload: Record<string, unknown> = {
       name: data.name,
       address,
       prefecture,
       city,
       town,
       address_detail: address_detail || null,
-      lat: coords?.lat ?? null,
-      lng: coords?.lng ?? null,
       nearest_line: data.nearest_line || null,
       nearest_station: data.nearest_station || null,
       walk_minutes: data.walk_minutes ? Number(data.walk_minutes) : null,
@@ -137,8 +206,7 @@ export default function NewPropertyPage() {
       land_area_sqm: data.land_area_sqm ? Number(data.land_area_sqm) : null,
       total_floor_area_sqm: Number(data.total_floor_area_sqm),
       exclusive_area_tsubo,
-      exclusive_area_sqm: exclusive_area_tsubo
-        ? Math.round(exclusive_area_tsubo * 3.30579) : null,
+      exclusive_area_sqm: exclusive_area_tsubo ? Math.round(exclusive_area_tsubo * 3.30579) : null,
       exclusive_tsubo_price,
       price,
       noi,
@@ -147,28 +215,52 @@ export default function NewPropertyPage() {
       ncf_yield: ncf != null && price ? ncf / price : null,
       tenant_count: data.tenant_count ? Number(data.tenant_count) : null,
       occupancy_rate: data.occupancy_rate ? Number(data.occupancy_rate) : null,
-      monthly_rent_income: data.monthly_rent_income
-        ? Number(data.monthly_rent_income) : null,
+      monthly_rent_income: data.monthly_rent_income ? Number(data.monthly_rent_income) : null,
       status,
     }
 
-    const { data: property, error } = await supabase
-      .from('properties')
-      .insert(payload)
-      .select('id')
-      .single()
+    if (addressChanged && coords) {
+      payload.lat = coords.lat
+      payload.lng = coords.lng
+    }
 
-    if (error) { setError(error.message); return }
-    router.push(`/properties/${property.id}`)
+    const { error: updateError } = await supabase
+      .from('properties')
+      .update(payload)
+      .eq('id', id)
+
+    if (updateError) { setError(updateError.message); return }
+    router.push(`/properties/${id}`)
     router.refresh()
+  }
+
+  if (loading) {
+    return (
+      <div className="p-8 flex items-center justify-center">
+        <p className="text-gray-500 text-sm">読み込み中...</p>
+      </div>
+    )
+  }
+
+  if (error && (error.includes('見つかりません') || error.includes('編集できません'))) {
+    return (
+      <div className="p-8 max-w-3xl">
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+        <Link href={`/properties/${id}`} className="text-sm text-[#1F3864] hover:underline">
+          ← 物件詳細に戻る
+        </Link>
+      </div>
+    )
   }
 
   return (
     <div className="p-8 max-w-3xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">物件を登録する</h1>
+        <h1 className="text-2xl font-bold text-gray-900">物件を編集する</h1>
         <p className="text-sm text-gray-500 mt-1">
-          下書き保存後に公開申請できます
+          変更後に下書き保存または公開申請できます
         </p>
       </div>
 
@@ -212,6 +304,11 @@ export default function NewPropertyPage() {
               <Input placeholder="1-1-1 ○○ビル" {...register('address_detail')} />
             </Field>
           </div>
+          {addressChanged && (
+            <p className="text-xs text-amber-600">
+              ※ 住所が変更されました。保存時に緯度経度を再取得します。
+            </p>
+          )}
           <p className="text-xs text-gray-400">都道府県〜番地を結合して緯度経度を自動取得します</p>
 
           <Field label="用途" required>
@@ -305,12 +402,15 @@ export default function NewPropertyPage() {
         </Section>
 
         <div className="flex gap-3">
+          <Link href={`/properties/${id}`}>
+            <Button type="button" variant="outline">キャンセル</Button>
+          </Link>
           <Button
             type="button"
             variant="outline"
             onClick={handleSubmit((d) => save(d, 'draft'), (errs) => {
               setValidationErrors(
-                (Object.keys(errs) as (keyof FormData)[]).map(key =>
+                (Object.keys(errs) as (keyof FormData)[]).map((key) =>
                   `${FIELD_LABELS[key] ?? key}: ${(errs[key] as any)?.message ?? 'エラー'}`
                 )
               )
@@ -325,7 +425,7 @@ export default function NewPropertyPage() {
             className="bg-[#1F3864] hover:bg-[#162a4e]"
             onClick={handleSubmit((d) => save(d, 'pending_approval'), (errs) => {
               setValidationErrors(
-                (Object.keys(errs) as (keyof FormData)[]).map(key =>
+                (Object.keys(errs) as (keyof FormData)[]).map((key) =>
                   `${FIELD_LABELS[key] ?? key}: ${(errs[key] as any)?.message ?? 'エラー'}`
                 )
               )

@@ -9,6 +9,19 @@ export function formatPrice(value: number | null): string {
   return `${value.toLocaleString()}円`
 }
 
+// 物件価格専用: 常に億円単位で表示（例: 50億円、1.5億円）
+export function formatPropertyPrice(value: number | null): string {
+  if (value == null) return '—'
+  const oku = value / 1_0000_0000
+  const formatted =
+    oku >= 100
+      ? oku.toFixed(0)
+      : oku >= 1
+      ? parseFloat(oku.toFixed(1)).toString()
+      : parseFloat(oku.toFixed(2)).toString()
+  return `${formatted}億円`
+}
+
 export function formatYield(value: number | null): string {
   if (value == null) return '—'
   return `${(value * 100).toFixed(2)}%`

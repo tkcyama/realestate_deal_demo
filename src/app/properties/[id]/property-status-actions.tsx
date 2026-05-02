@@ -69,6 +69,18 @@ export function PropertyStatusActions({ propertyId, currentStatus }: Props) {
           {loading ? '処理中...' : '申請を取り消す'}
         </Button>
       )}
+
+      {currentStatus === 'published' && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="border-amber-400 text-amber-700 hover:bg-amber-50"
+          onClick={() => updateStatus('draft')}
+          disabled={loading}
+        >
+          {loading ? '処理中...' : '非公開に戻す'}
+        </Button>
+      )}
     </div>
   )
 }

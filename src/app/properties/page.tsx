@@ -1,10 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { PropertyMap } from '@/components/map/property-map'
-import { formatPrice, formatYield, formatArea } from '@/lib/format'
+import { formatPropertyPrice, formatYield, formatArea } from '@/lib/format'
+import { PropertyFilters } from './property-filters'
 import {
   USE_TYPE_LABELS,
   PROPERTY_STATUS_LABELS,
@@ -19,21 +20,51 @@ const STATUS_STYLE: Record<PropertyStatus, string> = {
   sold:             'bg-blue-100 text-blue-700',
 }
 
-export default async function PropertiesPage() {
+type SearchParams = {
+  q?: string
+  use_type?: string
+  prefecture?: string
+  price_min?: string
+  price_max?: string
+}
+
+export default async function PropertiesPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>
+}) {
+  const params = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
+  // フィルター条件を共通関数で適用
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function applyFilters(query: any): any {
+    let q = query
+    if (params.q) {
+      const like = `%${params.q}%`
+      q = q.or(`name.ilike.${like},address.ilike.${like}`)
+    }
+    if (params.use_type) q = q.eq('use_type', params.use_type)
+    if (params.prefecture) q = q.ilike('prefecture', `%${params.prefecture}%`)
+    if (params.price_min) q = q.gte('price', Number(params.price_min) * 1_0000_0000)
+    if (params.price_max) q = q.lte('price', Number(params.price_max) * 1_0000_0000)
+    return q
+  }
+
   // 自分の物件（全ステータス）
-  const { data: ownProperties } = await supabase
+  const ownBase = supabase
     .from('properties')
     .select('*, profiles(company_name, full_name)')
     .eq('seller_id', user.id)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
 
-  // 公開中物件（他者含む）
-  const { data: publishedProperties } = await supabase
+  const { data: ownProperties } = await applyFilters(ownBase)
+
+  // 公開中物件（他者）
+  const pubBase = supabase
     .from('properties')
     .select('*, profiles(company_name, full_name)')
     .eq('status', 'published')
@@ -41,14 +72,10 @@ export default async function PropertiesPage() {
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
 
+  const { data: publishedProperties } = await applyFilters(pubBase)
+
   const own = (ownProperties ?? []) as Property[]
   const published = (publishedProperties ?? []) as Property[]
-
-  // 地図用データ（ピン種別付き）
-  const mapProperties = [
-    ...own.map((p) => ({ ...p, pin_type: 'own' as const })),
-    ...published.map((p) => ({ ...p, pin_type: 'published' as const })),
-  ]
 
   return (
     <div className="p-8">
@@ -66,18 +93,25 @@ export default async function PropertiesPage() {
         </Link>
       </div>
 
-      {/* 地図 */}
-      <div className="h-[420px] mb-8">
-        <PropertyMap properties={mapProperties} currentUserId={user.id} />
-      </div>
+      {/* フィルター */}
+      <Suspense>
+        <PropertyFilters
+          q={params.q}
+          use_type={params.use_type}
+          prefecture={params.prefecture}
+          price_min={params.price_min}
+          price_max={params.price_max}
+        />
+      </Suspense>
 
       {/* 保有物件 */}
       <section className="mb-8">
         <h2 className="text-base font-semibold text-gray-700 mb-3">
-          保有物件 <span className="text-gray-400 font-normal text-sm">({own.length}件)</span>
+          保有物件{' '}
+          <span className="text-gray-400 font-normal text-sm">({own.length}件)</span>
         </h2>
         {own.length === 0 ? (
-          <EmptyState message="登録されている物件がありません" />
+          <EmptyState message="条件に合う物件がありません" />
         ) : (
           <PropertyGrid properties={own} showStatus />
         )}
@@ -86,10 +120,11 @@ export default async function PropertiesPage() {
       {/* 公開中物件 */}
       <section>
         <h2 className="text-base font-semibold text-gray-700 mb-3">
-          公開中物件（他社）<span className="text-gray-400 font-normal text-sm">({published.length}件)</span>
+          公開中物件（他社）{' '}
+          <span className="text-gray-400 font-normal text-sm">({published.length}件)</span>
         </h2>
         {published.length === 0 ? (
-          <EmptyState message="現在公開中の物件はありません" />
+          <EmptyState message="条件に合う公開中物件はありません" />
         ) : (
           <PropertyGrid properties={published} />
         )}
@@ -141,7 +176,7 @@ function PropertyGrid({
           <div className="space-y-1 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-500">売却希望価格</span>
-              <span className="font-semibold text-gray-900">{formatPrice(p.price)}</span>
+              <span className="font-semibold text-gray-900">{formatPropertyPrice(p.price)}</span>
             </div>
             {p.noi_yield != null && (
               <div className="flex justify-between">
