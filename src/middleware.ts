@@ -26,7 +26,6 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const { pathname } = request.nextUrl
 
-  // 認証済みユーザーを auth ページから弾く
   if (pathname.startsWith('/auth')) {
     if (user) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
@@ -34,14 +33,12 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse
   }
 
-  // 未認証ユーザーを保護ルートから弾く
   if (!user) {
     const loginUrl = new URL('/auth/login', request.url)
     loginUrl.searchParams.set('next', pathname)
     return NextResponse.redirect(loginUrl)
   }
 
-  // 管理者ルートのアクセス制御
   if (pathname.startsWith('/admin')) {
     const { data: profile } = await supabase
       .from('profiles')
@@ -50,7 +47,9 @@ export async function middleware(request: NextRequest) {
       .single()
 
     if (!profile?.is_admin) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+      const url = new URL('/dashboard', request.url)
+      url.searchParams.set('error', 'admin_required')
+      return NextResponse.redirect(url)
     }
   }
 

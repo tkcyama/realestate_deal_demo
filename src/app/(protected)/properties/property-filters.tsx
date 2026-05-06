@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { useCallback, useRef } from 'react'
+import { useCallback, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { USE_TYPE_LABELS, type PropertyUse } from '@/types'
 
@@ -17,30 +17,28 @@ export function PropertyFilters({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const qRef = useRef<HTMLInputElement>(null)
-  const prefRef = useRef<HTMLInputElement>(null)
-  const pMinRef = useRef<HTMLInputElement>(null)
-  const pMaxRef = useRef<HTMLInputElement>(null)
 
-  const buildUrl = useCallback((overrides: Record<string, string>) => {
+  const [qValue, setQValue] = useState(q ?? '')
+  const [prefValue, setPrefValue] = useState(prefecture ?? '')
+  const [pMinValue, setPMinValue] = useState(price_min ?? '')
+  const [pMaxValue, setPMaxValue] = useState(price_max ?? '')
+
+  const commit = useCallback((overrides: Record<string, string> = {}) => {
     const params = new URLSearchParams(searchParams.toString())
-    const merged = {
-      q: qRef.current?.value ?? '',
-      prefecture: prefRef.current?.value ?? '',
-      price_min: pMinRef.current?.value ?? '',
-      price_max: pMaxRef.current?.value ?? '',
+    const values: Record<string, string> = {
+      q: qValue,
+      prefecture: prefValue,
+      price_min: pMinValue,
+      price_max: pMaxValue,
+      use_type: use_type ?? '',
       ...overrides,
     }
-    Object.entries(merged).forEach(([k, v]) => {
+    Object.entries(values).forEach(([k, v]) => {
       if (v) params.set(k, v)
       else params.delete(k)
     })
-    return `${pathname}?${params.toString()}`
-  }, [pathname, searchParams])
-
-  const commit = useCallback((overrides: Record<string, string> = {}) => {
-    router.push(buildUrl(overrides))
-  }, [router, buildUrl])
+    router.push(`${pathname}?${params.toString()}`)
+  }, [router, pathname, searchParams, qValue, prefValue, pMinValue, pMaxValue, use_type])
 
   const hasFilter = q || use_type || prefecture || price_min || price_max
 
@@ -51,11 +49,11 @@ export function PropertyFilters({
         <div className="flex-1 min-w-44">
           <label className="text-xs text-gray-500 block mb-1">キーワード</label>
           <Input
-            ref={qRef}
             placeholder="物件名・住所"
-            defaultValue={q ?? ''}
-            onKeyDown={(e) => { if (e.key === 'Enter') commit() }}
-            onBlur={() => commit()}
+            value={qValue}
+            onChange={(e) => setQValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') commit({ q: qValue }) }}
+            onBlur={() => commit({ q: qValue })}
           />
         </div>
 
@@ -64,7 +62,7 @@ export function PropertyFilters({
           <label className="text-xs text-gray-500 block mb-1">用途</label>
           <select
             className="border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1F3864] h-10"
-            defaultValue={use_type ?? ''}
+            value={use_type ?? ''}
             onChange={(e) => commit({ use_type: e.target.value })}
           >
             <option value="">すべて</option>
@@ -78,12 +76,12 @@ export function PropertyFilters({
         <div>
           <label className="text-xs text-gray-500 block mb-1">都道府県</label>
           <Input
-            ref={prefRef}
             placeholder="東京都"
             className="w-28"
-            defaultValue={prefecture ?? ''}
-            onKeyDown={(e) => { if (e.key === 'Enter') commit() }}
-            onBlur={() => commit()}
+            value={prefValue}
+            onChange={(e) => setPrefValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') commit({ prefecture: prefValue }) }}
+            onBlur={() => commit({ prefecture: prefValue })}
           />
         </div>
 
@@ -92,23 +90,23 @@ export function PropertyFilters({
           <label className="text-xs text-gray-500 block mb-1">価格（億円）</label>
           <div className="flex items-center gap-1">
             <Input
-              ref={pMinRef}
               type="number"
               placeholder="下限"
               className="w-20"
-              defaultValue={price_min ?? ''}
-              onKeyDown={(e) => { if (e.key === 'Enter') commit() }}
-              onBlur={() => commit()}
+              value={pMinValue}
+              onChange={(e) => setPMinValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') commit({ price_min: pMinValue }) }}
+              onBlur={() => commit({ price_min: pMinValue })}
             />
             <span className="text-gray-400 text-sm">〜</span>
             <Input
-              ref={pMaxRef}
               type="number"
               placeholder="上限"
               className="w-20"
-              defaultValue={price_max ?? ''}
-              onKeyDown={(e) => { if (e.key === 'Enter') commit() }}
-              onBlur={() => commit()}
+              value={pMaxValue}
+              onChange={(e) => setPMaxValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') commit({ price_max: pMaxValue }) }}
+              onBlur={() => commit({ price_max: pMaxValue })}
             />
           </div>
         </div>

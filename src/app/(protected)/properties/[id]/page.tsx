@@ -4,8 +4,10 @@ import { createClient } from '@/lib/supabase/server'
 import {
   USE_TYPE_LABELS,
   PROPERTY_STATUS_LABELS,
+  SALE_OFFER_STATUS_LABELS,
   type Property,
   type PropertyStatus,
+  type SaleOfferStatus,
 } from '@/types'
 import { formatPropertyPrice, formatPrice, formatYield, formatArea, formatNumber } from '@/lib/format'
 import { Badge } from '@/components/ui/badge'
@@ -54,15 +56,18 @@ export default async function PropertyDetailPage({
 
   let hasDetailAccess = isOwner || profile?.is_admin
 
+  // 自分が受信した売却オファーの状態を確認
+  let mySaleOffer: { id: string; status: SaleOfferStatus } | null = null
   if (!hasDetailAccess) {
     const { data: offer } = await supabase
       .from('sale_offers')
-      .select('id')
+      .select('id, status')
       .eq('property_id', id)
       .eq('recipient_id', user.id)
-      .eq('status', 'considering')
+      .in('status', ['pending', 'considering'])
       .maybeSingle()
-    hasDetailAccess = !!offer
+    mySaleOffer = offer as { id: string; status: SaleOfferStatus } | null
+    hasDetailAccess = mySaleOffer?.status === 'considering'
   }
 
   const s = STATUS_STYLE[p.status]
@@ -132,8 +137,14 @@ export default async function PropertyDetailPage({
               {p.land_area_sqm && (
                 <Metric label="土地面積" value={`${p.land_area_sqm.toFixed(1)}㎡`} />
               )}
-              {p.floors_above && (
-                <Metric label="階数" value={`地上${p.floors_above}階`} />
+              {(p.floors_above || p.floors_below) && (
+                <Metric
+                  label="階数"
+                  value={[
+                    p.floors_above ? `地上${p.floors_above}階` : '',
+                    p.floors_below ? `地下${p.floors_below}階` : '',
+                  ].filter(Boolean).join(' / ')}
+                />
               )}
             </MetricGrid>
           </InfoCard>
@@ -185,18 +196,52 @@ export default async function PropertyDetailPage({
             </InfoCard>
           ) : null}
 
-          {/* 公開中かつ非所有者 → オファー送信ボタン（Phase 3 で実装） */}
+          {/* 非所有者向けオファーパネル */}
           {!isOwner && p.status === 'published' && (
+            <div className="bg-white rounded-xl border p-4 space-y-3">
+              {/* 売却オファー未受信 → 売主がオファーを送る案内 */}
+              {!mySaleOffer && (
+                <p className="text-sm text-gray-500">
+                  売主からオファーが届いた場合、ここで確認できます
+                </p>
+              )}
+
+              {/* 返答待ち */}
+              {mySaleOffer?.status === 'pending' && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-yellow-700">
+                    売却オファーが届いています
+                  </p>
+                  <Link href="/offers">
+                    <Button size="sm" className="w-full">オファーを確認・返答する</Button>
+                  </Link>
+                </div>
+              )}
+
+              {/* 検討中 → 購入オファーを送れる */}
+              {mySaleOffer?.status === 'considering' && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-blue-700">
+                    検討中のオファー
+                  </p>
+                  <Link href={`/offers/purchase/new?saleOfferId=${mySaleOffer.id}&propertyId=${p.id}`}>
+                    <Button size="sm" className="w-full bg-[#C00000] hover:bg-[#900000]">
+                      購入オファーを送る
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 売主向け：この物件にオファーを送信するリンク */}
+          {isOwner && p.status === 'published' && (
             <div className="bg-white rounded-xl border p-4">
-              <p className="text-sm text-gray-600 mb-3">
-                この物件に興味がありますか？
-              </p>
-              <Button
-                className="w-full bg-[#C00000] hover:bg-[#900000]"
-                disabled
-              >
-                オファーを受け取る（Phase 3）
-              </Button>
+              <Link href={`/offers/sale/new?propertyId=${p.id}`}>
+                <Button size="sm" className="w-full" variant="outline">
+                  売却オファーを送信する
+                </Button>
+              </Link>
             </div>
           )}
         </div>

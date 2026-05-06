@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/client'
-import type { Profile, MemberRole } from '@/types'
+import type { Profile } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -25,11 +25,27 @@ const schema = z.object({
 })
 type FormData = z.infer<typeof schema>
 
-const ROLES: { value: MemberRole; label: string; description: string }[] = [
-  { value: 'seller', label: '売主', description: '物件を登録・売却する' },
-  { value: 'buyer', label: '買主', description: '物件を購入する' },
-  { value: 'lender', label: 'レンダー', description: '融資を提供する' },
+type RoleCategory = 'party' | 'lender'
+
+const ROLE_CATEGORIES: { value: RoleCategory; label: string; description: string }[] = [
+  { value: 'party',  label: '取引当事者', description: '物件の売却・購入を行う' },
+  { value: 'lender', label: 'レンダー',   description: '融資を提供する' },
 ]
+
+// DB roles ↔ 表示カテゴリの変換
+function rolesToCategories(roles: string[]): RoleCategory[] {
+  const cats: RoleCategory[] = []
+  if (roles.some(r => r === 'seller' || r === 'buyer')) cats.push('party')
+  if (roles.includes('lender')) cats.push('lender')
+  return cats
+}
+
+function categoriesToRoles(cats: RoleCategory[]): string[] {
+  const roles: string[] = []
+  if (cats.includes('party')) roles.push('seller', 'buyer')
+  if (cats.includes('lender')) roles.push('lender')
+  return roles
+}
 
 export default function ProfilePage() {
   return (
@@ -45,7 +61,7 @@ function ProfileForm() {
   const isSetup = searchParams.get('setup') === 'true'
 
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [selectedRoles, setSelectedRoles] = useState<MemberRole[]>([])
+  const [selectedCategories, setSelectedCategories] = useState<RoleCategory[]>([])
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [roleError, setRoleError] = useState(false)
@@ -66,7 +82,7 @@ function ProfileForm() {
         .single()
       if (data) {
         setProfile(data)
-        setSelectedRoles(data.roles ?? [])
+        setSelectedCategories(rolesToCategories(data.roles ?? []))
         reset({
           company_name: data.company_name,
           address: data.address,
@@ -80,15 +96,15 @@ function ProfileForm() {
     load()
   }, [reset])
 
-  function toggleRole(role: MemberRole) {
-    setSelectedRoles((prev) =>
-      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
+  function toggleCategory(cat: RoleCategory) {
+    setSelectedCategories(prev =>
+      prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
     )
     setRoleError(false)
   }
 
   async function onSubmit(data: FormData) {
-    if (selectedRoles.length === 0) {
+    if (selectedCategories.length === 0) {
       setRoleError(true)
       return
     }
@@ -103,7 +119,7 @@ function ProfileForm() {
       .from('profiles')
       .update({
         ...data,
-        roles: selectedRoles,
+        roles: categoriesToRoles(selectedCategories),
       })
       .eq('id', user.id)
 
@@ -159,14 +175,14 @@ function ProfileForm() {
             ロール <span className="text-red-500">*</span>
           </h2>
           <p className="text-sm text-gray-500 mb-4">複数選択可能です</p>
-          <div className="grid grid-cols-3 gap-3">
-            {ROLES.map((role) => {
-              const selected = selectedRoles.includes(role.value)
+          <div className="grid grid-cols-2 gap-3">
+            {ROLE_CATEGORIES.map((cat) => {
+              const selected = selectedCategories.includes(cat.value)
               return (
                 <button
-                  key={role.value}
+                  key={cat.value}
                   type="button"
-                  onClick={() => toggleRole(role.value)}
+                  onClick={() => toggleCategory(cat.value)}
                   className={`p-4 rounded-lg border-2 text-left transition-colors ${
                     selected
                       ? 'border-[#1F3864] bg-[#1F3864]/5'
@@ -174,12 +190,12 @@ function ProfileForm() {
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-gray-900">{role.label}</span>
+                    <span className="font-medium text-gray-900">{cat.label}</span>
                     {selected && (
                       <Badge className="bg-[#1F3864] text-white text-xs px-1.5">✓</Badge>
                     )}
                   </div>
-                  <p className="text-xs text-gray-500">{role.description}</p>
+                  <p className="text-xs text-gray-500">{cat.description}</p>
                 </button>
               )
             })}

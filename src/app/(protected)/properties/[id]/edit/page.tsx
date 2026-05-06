@@ -25,7 +25,7 @@ const intNum = (min = 0) =>
 
 const schema = z.object({
   name: z.string().min(1, '物件名を入力してください'),
-  prefecture: z.string().min(1, '都道府県を入力してください'),
+  prefecture: z.string().min(1, '都道府県を入力してください').max(4, '都道府県は4文字以内で入力してください（例：東京都）'),
   city: z.string().min(1, '市区町村を入力してください'),
   town: z.string().min(1, '町域を入力してください'),
   address_detail: z.string().optional(),
@@ -290,7 +290,7 @@ export default function EditPropertyPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <Field label="都道府県" required error={errors.prefecture?.message}>
-              <Input placeholder="東京都" {...register('prefecture')} />
+              <Input placeholder="東京都" maxLength={4} {...register('prefecture')} />
             </Field>
             <Field label="市区町村" required error={errors.city?.message}>
               <Input placeholder="千代田区" {...register('city')} />

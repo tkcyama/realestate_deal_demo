@@ -8,14 +8,16 @@ const statusLabel: Record<string, { label: string; class: string }> = {
   suspended:{ label: '停止中', class: 'bg-red-100 text-red-700 border-red-200' },
 }
 
-const roleLabels: Record<string, string> = {
-  seller: '売主',
-  buyer: '買主',
-  lender: 'レンダー',
+function getRoleDisplayCategories(roles: string[]): string[] {
+  const cats: string[] = []
+  if (roles.some((r: string) => r === 'seller' || r === 'buyer')) cats.push('取引当事者')
+  if (roles.includes('lender')) cats.push('レンダー')
+  return cats
 }
 
 export default async function MembersPage() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
   const { data: members } = await supabase
     .from('profiles')
     .select('*')
@@ -39,19 +41,19 @@ export default async function MembersPage() {
               {pending.length}
             </span>
           </h2>
-          <MemberTable members={pending} />
+          <MemberTable members={pending} currentUserId={user?.id} />
         </section>
       )}
 
       <section>
         <h2 className="text-base font-semibold text-gray-700 mb-3">全会員</h2>
-        <MemberTable members={others} />
+        <MemberTable members={others} currentUserId={user?.id} />
       </section>
     </div>
   )
 }
 
-function MemberTable({ members }: { members: any[] }) {
+function MemberTable({ members, currentUserId }: { members: any[], currentUserId?: string }) {
   if (members.length === 0) {
     return (
       <div className="bg-white rounded-xl border p-8 text-center text-gray-400 text-sm">
@@ -89,17 +91,17 @@ function MemberTable({ members }: { members: any[] }) {
                 <td className="px-4 py-3 text-gray-600">{member.email}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">
-                    {member.roles?.map((r: string) => (
-                      <span
-                        key={r}
-                        className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full"
-                      >
-                        {roleLabels[r] ?? r}
-                      </span>
-                    ))}
-                    {(!member.roles || member.roles.length === 0) && (
-                      <span className="text-xs text-gray-300">未設定</span>
-                    )}
+                    {member.roles && member.roles.length > 0
+                      ? getRoleDisplayCategories(member.roles).map((label: string) => (
+                          <span
+                            key={label}
+                            className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full"
+                          >
+                            {label}
+                          </span>
+                        ))
+                      : <span className="text-xs text-gray-300">未設定</span>
+                    }
                   </div>
                 </td>
                 <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
@@ -111,7 +113,11 @@ function MemberTable({ members }: { members: any[] }) {
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <MemberActions memberId={member.id} currentStatus={member.status} />
+                  {member.id === currentUserId ? (
+                    <span className="text-xs text-gray-400">（自分）</span>
+                  ) : (
+                    <MemberActions memberId={member.id} currentStatus={member.status} />
+                  )}
                 </td>
               </tr>
             )

@@ -1,15 +1,18 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Sidebar } from '@/components/layout/sidebar'
+import { LogoutButton } from '@/components/layout/logout-button'
+import { PageHeader } from '@/components/layout/page-header'
 
-export default async function DashboardLayout({
+export const dynamic = 'force-dynamic'
+
+export default async function ProtectedLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-
   if (!user) redirect('/auth/login')
 
   const { data: profile } = await supabase
@@ -20,7 +23,6 @@ export default async function DashboardLayout({
 
   if (!profile) redirect('/auth/login')
 
-  // 審査中の場合は専用メッセージページ
   if (profile.status === 'pending') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -34,6 +36,7 @@ export default async function DashboardLayout({
           <p className="text-gray-400 text-xs mt-4">
             ご不明な点はお問い合わせください。
           </p>
+          <LogoutButton className="mt-6" />
         </div>
       </div>
     )
@@ -48,6 +51,7 @@ export default async function DashboardLayout({
           <p className="text-gray-600 text-sm">
             詳細については管理者にお問い合わせください。
           </p>
+          <LogoutButton className="mt-6" />
         </div>
       </div>
     )
@@ -57,6 +61,7 @@ export default async function DashboardLayout({
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar isAdmin={profile.is_admin} />
       <main className="flex-1 overflow-auto">
+        <PageHeader />
         {children}
       </main>
     </div>

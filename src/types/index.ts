@@ -99,5 +99,84 @@ export type PurchaseOfferStatus =
 export type LoanOfferStatus =
   | 'pending' | 'considering' | 'offered_back' | 'declined' | 'expired' | 'completed'
 
+export type SaleOffer = {
+  id: string
+  property_id: string
+  sender_id: string
+  recipient_id: string
+  status: SaleOfferStatus
+  message: string | null
+  expires_at: string
+  responded_at: string | null
+  created_at: string
+  updated_at: string
+  // JOIN
+  properties?: Pick<Property, 'id' | 'name' | 'address' | 'use_type' | 'price' | 'noi_yield' | 'status'>
+  sender?: Pick<Profile, 'id' | 'company_name' | 'full_name'>
+  recipient?: Pick<Profile, 'id' | 'company_name' | 'full_name'>
+}
+
+export type PurchaseOffer = {
+  id: string
+  property_id: string
+  sale_offer_id: string | null
+  buyer_id: string
+  seller_id: string
+  offer_price: number
+  conditions: string | null
+  message: string | null
+  counter_price: number | null
+  counter_conditions: string | null
+  status: PurchaseOfferStatus
+  expires_at: string
+  responded_at: string | null
+  agreed_at: string | null
+  created_at: string
+  updated_at: string
+  // JOIN
+  properties?: Pick<Property, 'id' | 'name' | 'address' | 'use_type' | 'price' | 'noi_yield'>
+  buyer?: Pick<Profile, 'id' | 'company_name' | 'full_name'>
+  seller?: Pick<Profile, 'id' | 'company_name' | 'full_name'>
+}
+
+export type Notification = {
+  id: string
+  user_id: string
+  type: NotificationType
+  ref_id: string | null
+  message: string
+  is_read: boolean
+  created_at: string
+}
+
+export type NotificationType =
+  | 'member_approved'
+  | 'member_rejected'
+  | 'property_approved'
+  | 'property_rejected'
+  | 'sale_offer_received'
+  | 'sale_offer_responded'
+  | 'purchase_offer_received'
+  | 'purchase_offer_responded'
+  | 'loan_offer_received'
+  | 'loan_offer_responded'
+  | 'transaction_completed'
+
+export const SALE_OFFER_STATUS_LABELS: Record<SaleOfferStatus, string> = {
+  pending:    '返答待ち',
+  considering: '検討中',
+  declined:   '見送り',
+  expired:    '期限切れ',
+}
+
+export const PURCHASE_OFFER_STATUS_LABELS: Record<PurchaseOfferStatus, string> = {
+  pending:        '返答待ち',
+  accepted:       '承諾済み',
+  counter_offered: '条件変更',
+  declined:       '拒否',
+  expired:        '期限切れ',
+  agreed:         '合意済み',
+}
+
 // ── 取引事例 ──────────────────────────────────────────────────
 export type PartyType = 'fund' | 'reit' | 'corporate' | 'individual' | 'other'

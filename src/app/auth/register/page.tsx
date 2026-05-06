@@ -58,7 +58,11 @@ export default function RegisterPage() {
       },
     })
     if (error) {
-      setError(error.message)
+      if (error.message.toLowerCase().includes('rate limit')) {
+        setError('メール送信の上限に達しました。しばらく時間をおいてから再度お試しください（1時間あたりの送信数制限があります）。')
+      } else {
+        setError(error.message)
+      }
       return
     }
     setDone(true)

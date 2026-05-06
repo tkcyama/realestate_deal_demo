@@ -78,6 +78,41 @@
 4. 承認後にパスワード設定メール送信
 5. 初回ログイン時にロール選択（複数可）
 
+## オファー管理 仕様詳細（Phase 3 実装確定事項）
+
+### オファーフロー
+
+```
+売主が売却オファー送信（sale_offers: pending）
+  └─ 買主が返答
+       ├─ [見送り] → declined
+       └─ [検討する] → considering
+              ├─ 物件詳細（収支）が閲覧可能になる
+              └─ 買主が購入オファー送信（purchase_offers: pending）
+                   └─ 売主が返答
+                        ├─ [拒否] → declined
+                        ├─ [条件変更] → counter_offered（counter_price / counter_conditions を保存）
+                        └─ [承諾] → accepted
+                               └─ 買主が合意確定 → agreed（agreed_at を記録）
+```
+
+### Server Actions（`src/app/offers/actions.ts`）
+
+| 関数 | 処理 |
+|------|------|
+| `sendSaleOffer` | 売主→買主へ売却オファー送信（重複チェック・通知作成） |
+| `respondSaleOffer` | 買主が「検討する」「見送り」で返答 |
+| `sendPurchaseOffer` | 買主→売主へ購入オファー送信（億円入力→円変換） |
+| `respondPurchaseOffer` | 売主が「承諾」「条件変更」「拒否」で返答 |
+| `agreeOffer` | 買主が取引合意確定（accepted → agreed） |
+| `markNotificationRead` | 個別通知を既読に変更 |
+| `markAllNotificationsRead` | 全通知を一括既読 |
+
+### 物件詳細アクセス権限
+
+- 収支詳細（NOI・NCF・稼働率等）は `sale_offer.status = 'considering'` 以降のみ表示
+- 売主本人・管理者は常時アクセス可能
+
 ## 物件管理 仕様詳細（実装確定事項）
 
 ### 物件ステータス遷移

@@ -6,11 +6,12 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 
 const navItems = [
-  { href: '/dashboard', label: 'ダッシュボード', icon: '🏠' },
-  { href: '/properties', label: '物件管理', icon: '🏢' },
-  { href: '/offers', label: 'オファー管理', icon: '📋' },
-  { href: '/transactions', label: '取引事例', icon: '📊' },
-  { href: '/profile', label: 'プロフィール', icon: '👤' },
+  { href: '/dashboard',      label: 'ダッシュボード', icon: '🏠' },
+  { href: '/properties',     label: '物件管理',      icon: '🏢' },
+  { href: '/map',            label: '地図表示',      icon: '🗺️' },
+  { href: '/offers',         label: 'オファー管理',  icon: '📋' },
+  { href: '/transactions',   label: '取引事例',      icon: '📊' },
+  { href: '/profile',        label: 'プロフィール',  icon: '👤' },
 ]
 
 const adminItems = [
@@ -35,10 +36,10 @@ export function Sidebar({ isAdmin }: Props) {
 
   return (
     <aside className="w-60 shrink-0 flex flex-col bg-[#1F3864] text-white min-h-screen">
-      <div className="px-6 py-5 border-b border-white/10">
+      <Link href="/dashboard" className="block px-6 py-5 border-b border-white/10 hover:bg-white/5 transition-colors">
         <h1 className="text-lg font-bold tracking-wide">PropConnect</h1>
         <p className="text-xs text-white/50 mt-0.5">不動産取引プラットフォーム</p>
-      </div>
+      </Link>
 
       <nav className="flex-1 px-3 py-4 space-y-1">
         {navItems.map((item) => (
