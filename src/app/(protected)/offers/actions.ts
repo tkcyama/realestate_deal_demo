@@ -230,7 +230,7 @@ export async function respondPurchaseOffer(
       .eq('property_id', offer.property_id)
       .eq('seller_id', user.id)
       .neq('id', offerId)
-      .in('status', ['pending', 'counter_offered'])
+      .in('status', ['pending', 'counter_offered', 'accepted'])
 
     if (otherOffers && otherOffers.length > 0) {
       await supabase
@@ -309,6 +309,13 @@ export async function agreeOffer(offerId: string) {
 
   if (!offer) return { error: 'オファーが見つかりません' }
   if (offer.status !== 'accepted') return { error: '承諾済みのオファーのみ合意できます' }
+
+  // 同一物件で既に合意済みのオファーがある場合は二重合意を防止
+  // RLSでは買主が他の買主のレコードを参照できないため SECURITY DEFINER 関数で確認
+  const { data: hasAgreed } = await supabase
+    .rpc('check_property_has_agreed_offer', { p_property_id: offer.property_id })
+
+  if (hasAgreed) return { error: 'この物件はすでに他の買主と取引合意済みです' }
 
   const { data: updated, error } = await supabase
     .from('purchase_offers')

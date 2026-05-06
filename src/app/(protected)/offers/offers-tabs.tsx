@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -26,11 +27,13 @@ const SALE_ACTIVE: string[]    = ['pending', 'considering']
 const PURCHASE_ACTIVE: string[] = ['pending', 'counter_offered', 'accepted']
 const TERMINAL: string[]        = ['declined', 'expired']
 
+type TabValue = 'active' | 'agreed' | 'history'
+const VALID_TABS: TabValue[] = ['active', 'agreed', 'history']
+
 export default function OffersTabs({ rSale, sSale, sPurchase, rPurchase }: Props) {
   const searchParams = useSearchParams()
-  const defaultTab = (['active', 'agreed', 'history'] as const).includes(
-    searchParams.get('tab') as 'active' | 'agreed' | 'history'
-  ) ? (searchParams.get('tab') as string) : 'active'
+  const paramTab = searchParams.get('tab') as TabValue
+  const [tab, setTab] = useState<TabValue>(VALID_TABS.includes(paramTab) ? paramTab : 'active')
   // ── 進行中 ─────────────────────────────────────────────────
   const activeRSale     = rSale.filter(o => SALE_ACTIVE.includes(o.status))
   const activeSSale     = sSale.filter(o => SALE_ACTIVE.includes(o.status))
@@ -54,7 +57,7 @@ export default function OffersTabs({ rSale, sSale, sPurchase, rPurchase }: Props
   const historyCount  = histRSale.length + histSSale.length + histRPurchase.length + histSPurchase.length
 
   return (
-    <Tabs defaultValue={defaultTab} className="w-full">
+    <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)} className="w-full">
       <TabsList className="mb-6">
         <TabsTrigger value="active" className="gap-1.5">
           進行中
