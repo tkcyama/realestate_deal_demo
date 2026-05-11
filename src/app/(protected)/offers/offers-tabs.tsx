@@ -194,11 +194,18 @@ export default function OffersTabs({ rSale, sSale, sPurchase, rPurchase }: Props
                   </div>
                   {offer.conditions && (
                     <p className="text-sm text-gray-600 bg-gray-50 rounded p-2">
-                      <span className="font-medium">条件:</span> {offer.conditions}
+                      <span className="font-medium">買主の条件:</span> {offer.conditions}
                     </p>
                   )}
                   {offer.message && (
                     <p className="text-sm text-gray-600 bg-gray-50 rounded p-2">{offer.message}</p>
+                  )}
+                  {offer.status === 'counter_offered' && (offer.counter_price || offer.counter_conditions) && (
+                    <div className="bg-amber-50 border border-amber-200 rounded p-2 text-sm space-y-1">
+                      <p className="font-medium text-amber-800">あなたの提示内容</p>
+                      {offer.counter_price && <p className="text-amber-700">提案価格: {formatPropertyPrice(offer.counter_price)}</p>}
+                      {offer.counter_conditions && <p className="text-amber-700">条件: {offer.counter_conditions}</p>}
+                    </div>
                   )}
                   {offer.status === 'pending' && (
                     <div className="flex justify-end">
@@ -236,15 +243,25 @@ export default function OffersTabs({ rSale, sSale, sPurchase, rPurchase }: Props
                   </div>
                   {offer.status === 'counter_offered' && (
                     <div className="bg-amber-50 border border-amber-200 rounded p-3 text-sm space-y-2">
-                      <p className="font-medium text-amber-800">条件変更の提案があります</p>
-                      {offer.counter_price && <p>提案価格: {formatPropertyPrice(offer.counter_price)}</p>}
-                      {offer.counter_conditions && <p>条件: {offer.counter_conditions}</p>}
+                      <p className="font-medium text-amber-800">売主から条件変更の提案があります</p>
+                      <div className="text-xs text-gray-500 space-y-0.5">
+                        <p>あなたの提示: {formatPropertyPrice(offer.offer_price)}{offer.conditions ? `／${offer.conditions}` : ''}</p>
+                        {offer.counter_price && <p>売主の提示: {formatPropertyPrice(offer.counter_price)}{offer.counter_conditions ? `／${offer.counter_conditions}` : ''}</p>}
+                      </div>
                       <CounterOfferActions offerId={offer.id} />
                     </div>
                   )}
                   {offer.status === 'accepted' && (
-                    <div className="flex justify-end">
-                      <AgreeButton offerId={offer.id} />
+                    <div className="space-y-2">
+                      {offer.counter_price && (
+                        <p className="text-xs text-gray-500">
+                          承諾価格: {formatPropertyPrice(offer.counter_price)}
+                          {offer.counter_conditions ? `（条件: ${offer.counter_conditions}）` : ''}
+                        </p>
+                      )}
+                      <div className="flex justify-end">
+                        <AgreeButton offerId={offer.id} />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -260,53 +277,72 @@ export default function OffersTabs({ rSale, sSale, sPurchase, rPurchase }: Props
           <EmptyState text="合意済みの取引はありません" />
         ) : (
           <div className="space-y-4">
-            {agreedDeals.map(deal => (
-              <div
-                key={deal.id}
-                className="border-2 border-emerald-200 rounded-xl p-5 bg-emerald-50 space-y-3"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-semibold bg-emerald-600 text-white rounded-full px-2 py-0.5">
-                        合意済
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {deal.role === 'buyer' ? '買主として' : '売主として'}
-                      </span>
+            {agreedDeals.map(deal => {
+              // 売主が条件変更を提示し買主が承諾した場合 → 合意価格・条件は売主の提示値
+              // 売主が買主の提示をそのまま承諾した場合 → 合意価格・条件は買主の提示値
+              const hasSellerCounter = deal.counter_price != null
+              const agreedPrice = hasSellerCounter ? deal.counter_price! : deal.offer_price
+              const agreedConditions = hasSellerCounter ? deal.counter_conditions : deal.conditions
+
+              return (
+                <div
+                  key={deal.id}
+                  className="border-2 border-emerald-200 rounded-xl p-5 bg-emerald-50 space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-semibold bg-emerald-600 text-white rounded-full px-2 py-0.5">
+                          合意済
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {deal.role === 'buyer' ? '買主として' : '売主として'}
+                        </span>
+                      </div>
+                      <p className="font-semibold text-gray-900 truncate">{deal.properties?.name}</p>
+                      <p className="text-sm text-gray-500 truncate">{deal.properties?.address}</p>
                     </div>
-                    <p className="font-semibold text-gray-900 truncate">{deal.properties?.name}</p>
-                    <p className="text-sm text-gray-500 truncate">{deal.properties?.address}</p>
+                    <div className="shrink-0 text-right space-y-1">
+                      <p className="text-lg font-bold text-emerald-700">{formatPropertyPrice(agreedPrice)}</p>
+                      <p className="text-xs text-gray-500">合意価格</p>
+                    </div>
                   </div>
-                  <div className="shrink-0 text-right space-y-1">
-                    <p className="text-lg font-bold text-emerald-700">{formatPropertyPrice(deal.offer_price)}</p>
-                    <p className="text-xs text-gray-500">合意価格</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-6 text-sm text-gray-600 border-t border-emerald-200 pt-3">
-                  <div>
-                    <span className="text-xs text-gray-400">
-                      {deal.role === 'buyer' ? '売主' : '買主'}
-                    </span>
-                    <p className="font-medium">
-                      {deal.role === 'buyer' ? deal.seller?.company_name : deal.buyer?.company_name}
-                    </p>
-                  </div>
-                  {deal.agreed_at && (
-                    <div>
-                      <span className="text-xs text-gray-400">合意日</span>
-                      <p className="font-medium">{new Date(deal.agreed_at).toLocaleDateString('ja-JP')}</p>
+
+                  {/* 価格交渉の経緯（条件変更があった場合のみ） */}
+                  {hasSellerCounter && (
+                    <div className="text-xs text-gray-500 bg-white rounded p-2 border border-emerald-100 space-y-0.5">
+                      <p className="font-medium text-gray-600">価格交渉の経緯</p>
+                      <p>買主の提示: {formatPropertyPrice(deal.offer_price)}</p>
+                      <p>売主の提示: {formatPropertyPrice(deal.counter_price!)} → 買主が承諾</p>
                     </div>
                   )}
+
+                  <div className="flex items-center gap-6 text-sm text-gray-600 border-t border-emerald-200 pt-3">
+                    <div>
+                      <span className="text-xs text-gray-400">
+                        {deal.role === 'buyer' ? '売主' : '買主'}
+                      </span>
+                      <p className="font-medium">
+                        {deal.role === 'buyer' ? deal.seller?.company_name : deal.buyer?.company_name}
+                      </p>
+                    </div>
+                    {deal.agreed_at && (
+                      <div>
+                        <span className="text-xs text-gray-400">合意日</span>
+                        <p className="font-medium">{new Date(deal.agreed_at).toLocaleDateString('ja-JP')}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {agreedConditions && (
+                    <p className="text-sm text-gray-600 bg-white rounded p-2 border border-emerald-100">
+                      <span className="font-medium">合意条件:</span>{' '}
+                      {agreedConditions}
+                    </p>
+                  )}
                 </div>
-                {(deal.conditions || deal.counter_conditions) && (
-                  <p className="text-sm text-gray-600 bg-white rounded p-2 border border-emerald-100">
-                    <span className="font-medium">合意条件:</span>{' '}
-                    {deal.counter_conditions ?? deal.conditions}
-                  </p>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </TabsContent>

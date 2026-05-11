@@ -125,14 +125,13 @@ export async function sendPurchaseOffer(formData: FormData) {
   if (isNaN(offerPriceOku) || offerPriceOku <= 0) return { error: '希望価格を正しく入力してください' }
 
   // 物件レベル：他の買主との取引が合意済みであれば送信不可
-  const { data: agreedDeal } = await supabase
-    .from('purchase_offers')
-    .select('id')
-    .eq('property_id', propertyId)
-    .eq('status', 'agreed')
-    .maybeSingle()
+  // 直接クエリはRLSで他の買主のレコードが見えないためSECURITY DEFINER関数を使用
+  // RPC失敗時はフェイルセーフとしてブロック
+  const { data: hasAgreed, error: agreedRpcError } = await supabase
+    .rpc('check_property_has_agreed_offer', { p_property_id: propertyId })
 
-  if (agreedDeal) return { error: 'この物件はすでに取引合意済みのため、新しいオファーは送信できません' }
+  if (agreedRpcError) return { error: '合意状況の確認に失敗しました。再度お試しください。' }
+  if (hasAgreed) return { error: 'この物件はすでに取引合意済みのため、新しいオファーは送信できません' }
 
   // 買主レベル：自分の未解決オファー（合意済み含む）があれば二重送信を禁止
   const { data: existing } = await supabase
@@ -312,9 +311,11 @@ export async function agreeOffer(offerId: string) {
 
   // 同一物件で既に合意済みのオファーがある場合は二重合意を防止
   // RLSでは買主が他の買主のレコードを参照できないため SECURITY DEFINER 関数で確認
-  const { data: hasAgreed } = await supabase
+  // RPC失敗時はフェイルセーフとしてブロック
+  const { data: hasAgreed, error: agreedRpcError } = await supabase
     .rpc('check_property_has_agreed_offer', { p_property_id: offer.property_id })
 
+  if (agreedRpcError) return { error: '合意状況の確認に失敗しました。再度お試しください。' }
   if (hasAgreed) return { error: 'この物件はすでに他の買主と取引合意済みです' }
 
   const { data: updated, error } = await supabase

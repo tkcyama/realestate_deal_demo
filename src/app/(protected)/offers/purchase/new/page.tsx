@@ -50,12 +50,11 @@ export default async function NewPurchaseOfferPage({ searchParams }: Props) {
   if (property.seller_id === user.id) redirect('/offers')
 
   // 物件レベル：他の買主との合意済み取引があれば全員ブロック
-  const { data: agreedDeal } = await supabase
-    .from('purchase_offers')
-    .select('id')
-    .eq('property_id', propertyId)
-    .eq('status', 'agreed')
-    .maybeSingle()
+  // 直接クエリはRLSで他の買主のレコードが見えないためSECURITY DEFINER関数を使用
+  // RPC失敗時はフェイルセーフとしてブロック扱い
+  const { data: isAgreed, error: rpcError } = await supabase
+    .rpc('check_property_has_agreed_offer', { p_property_id: propertyId })
+  const agreedDeal = isAgreed || rpcError != null
 
   // 買主レベル：自分の未解決オファー（合意済み含む）
   const { data: existingOffer } = agreedDeal

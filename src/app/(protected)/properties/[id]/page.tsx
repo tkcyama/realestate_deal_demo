@@ -70,6 +70,10 @@ export default async function PropertyDetailPage({
     hasDetailAccess = mySaleOffer?.status === 'considering'
   }
 
+  // 取引合意済みチェック（RLSをバイパスするSECURITY DEFINER関数を使用）
+  const { data: isAgreed } = await supabase
+    .rpc('check_property_has_agreed_offer', { p_property_id: id })
+
   const s = STATUS_STYLE[p.status]
 
   return (
@@ -186,50 +190,63 @@ export default async function PropertyDetailPage({
 
         {/* 右カラム：売主情報 */}
         <div className="space-y-4">
-          {isOwner || profile?.is_admin ? (
+          {(isOwner || profile?.is_admin || p.status === 'published') && (
             <InfoCard title="売主情報">
               <div className="space-y-2 text-sm">
                 <p className="font-medium text-gray-900">{p.profiles.company_name}</p>
                 <p className="text-gray-500">{p.profiles.full_name}</p>
-                <p className="text-gray-500 text-xs">{p.profiles.email}</p>
+                {(isOwner || profile?.is_admin) && (
+                  <p className="text-gray-500 text-xs">{p.profiles.email}</p>
+                )}
               </div>
             </InfoCard>
-          ) : null}
+          )}
 
           {/* 非所有者向けオファーパネル */}
           {!isOwner && p.status === 'published' && (
             <div className="bg-white rounded-xl border p-4 space-y-3">
-              {/* 売却オファー未受信 → 売主がオファーを送る案内 */}
-              {!mySaleOffer && (
-                <p className="text-sm text-gray-500">
-                  売主からオファーが届いた場合、ここで確認できます
-                </p>
-              )}
-
-              {/* 返答待ち */}
-              {mySaleOffer?.status === 'pending' && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-yellow-700">
-                    売却オファーが届いています
-                  </p>
-                  <Link href="/offers">
-                    <Button size="sm" className="w-full">オファーを確認・返答する</Button>
-                  </Link>
+              {/* 取引合意済み */}
+              {isAgreed ? (
+                <div className="text-center py-1">
+                  <span className="inline-block text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-3 py-1">
+                    取引合意済みです
+                  </span>
                 </div>
-              )}
+              ) : (
+                <>
+                  {/* 売却オファー未受信 → 売主がオファーを送る案内 */}
+                  {!mySaleOffer && (
+                    <p className="text-sm text-gray-500">
+                      売主からオファーが届いた場合、ここで確認できます
+                    </p>
+                  )}
 
-              {/* 検討中 → 購入オファーを送れる */}
-              {mySaleOffer?.status === 'considering' && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-blue-700">
-                    検討中のオファー
-                  </p>
-                  <Link href={`/offers/purchase/new?saleOfferId=${mySaleOffer.id}&propertyId=${p.id}`}>
-                    <Button size="sm" className="w-full bg-[#C00000] hover:bg-[#900000]">
-                      購入オファーを送る
-                    </Button>
-                  </Link>
-                </div>
+                  {/* 返答待ち */}
+                  {mySaleOffer?.status === 'pending' && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-yellow-700">
+                        売却オファーが届いています
+                      </p>
+                      <Link href="/offers">
+                        <Button size="sm" className="w-full">オファーを確認・返答する</Button>
+                      </Link>
+                    </div>
+                  )}
+
+                  {/* 検討中 → 購入オファーを送れる */}
+                  {mySaleOffer?.status === 'considering' && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-blue-700">
+                        検討中のオファー
+                      </p>
+                      <Link href={`/offers/purchase/new?saleOfferId=${mySaleOffer.id}&propertyId=${p.id}`}>
+                        <Button size="sm" className="w-full bg-[#C00000] hover:bg-[#900000]">
+                          購入オファーを送る
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -237,11 +254,19 @@ export default async function PropertyDetailPage({
           {/* 売主向け：この物件にオファーを送信するリンク */}
           {isOwner && p.status === 'published' && (
             <div className="bg-white rounded-xl border p-4">
-              <Link href={`/offers/sale/new?propertyId=${p.id}`}>
-                <Button size="sm" className="w-full" variant="outline">
-                  売却オファーを送信する
-                </Button>
-              </Link>
+              {isAgreed ? (
+                <div className="text-center py-1">
+                  <span className="inline-block text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-3 py-1">
+                    取引合意済みです
+                  </span>
+                </div>
+              ) : (
+                <Link href={`/offers/sale/new?propertyId=${p.id}`}>
+                  <Button size="sm" className="w-full" variant="outline">
+                    売却オファーを送信する
+                  </Button>
+                </Link>
+              )}
             </div>
           )}
         </div>
