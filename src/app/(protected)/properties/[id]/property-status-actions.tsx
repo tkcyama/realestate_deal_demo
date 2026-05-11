@@ -21,6 +21,18 @@ export function PropertyStatusActions({ propertyId, currentStatus }: Props) {
     setLoading(true)
     setError(null)
     const supabase = createClient()
+
+    // 合意済み物件の非公開操作をブロック
+    if (status === 'draft' && currentStatus === 'published') {
+      const { data: hasAgreed, error: rpcError } = await supabase
+        .rpc('check_property_has_agreed_offer', { p_property_id: propertyId })
+      if (rpcError || hasAgreed) {
+        setError('取引合意済みのため非公開に戻せません。')
+        setLoading(false)
+        return
+      }
+    }
+
     const { data: updated, error } = await supabase
       .from('properties')
       .update({ status })
